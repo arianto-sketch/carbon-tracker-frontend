@@ -1,0 +1,37 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { dashboardService } from '@/services/dashboard.service'
+import { useUiStore } from './ui.store'
+
+export const useDashboardStore = defineStore('dashboard', () => {
+  const summary = ref<any>(null)
+  const trendData = ref<any[]>([])
+  const categoryBreakdown = ref<any[]>([])
+  const topEntries = ref<any[]>([])
+  const projects = ref<any[]>([])
+  const loading = ref(false)
+
+  async function fetchDashboard(params = {}) {
+    loading.value = true
+    try {
+      const [s, t, c, top, p] = await Promise.all([
+        dashboardService.getSummary(params),
+        dashboardService.getTrend(params),
+        dashboardService.getCategoryBreakdown(params),
+        dashboardService.getTopEntries(params),
+        dashboardService.getProjects(params),
+      ])
+      summary.value = s
+      trendData.value = t
+      categoryBreakdown.value = c
+      topEntries.value = top
+      projects.value = p
+    } catch {
+      useUiStore().showError('Gagal memuat data dashboard.')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { summary, trendData, categoryBreakdown, topEntries, projects, loading, fetchDashboard }
+})
