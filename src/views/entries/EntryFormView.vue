@@ -16,7 +16,7 @@
             density="comfortable"
             :rules="[v => !!v || 'Wajib dipilih']"
             class="mb-3"
-            @update:model-value="loadFactors"
+            @update:model-value="onCategoryChange"
           />
           <v-select
             v-model="form.emission_factor_id"
@@ -195,11 +195,17 @@ const estimatedCo2 = computed(() =>
   form.value.quantity && selectedFactor.value ? form.value.quantity * selectedFactor.value.factor_value : 0
 )
 
+// Semua faktor aktif kategori ini dalam satu halaman (sebelumnya terpotong di 20)
 async function loadFactors() {
-  form.value.emission_factor_id = null
-  if (!form.value.category_id) return
-  const res = await categoriesService.listFactors({ category_id: form.value.category_id })
+  if (!form.value.category_id) { factors.value = []; return }
+  const res = await categoriesService.listFactors({ category_id: form.value.category_id, per_page: 100 })
   factors.value = res.data
+}
+
+// Ganti kategori -> pilihan faktor lama tidak berlaku lagi
+async function onCategoryChange() {
+  form.value.emission_factor_id = null
+  await loadFactors()
 }
 
 function updateUnit() {}

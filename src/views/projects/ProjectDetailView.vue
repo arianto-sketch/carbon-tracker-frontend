@@ -31,7 +31,7 @@
         <v-window-item value="entries">
           <div class="d-flex align-center justify-space-between mb-3">
             <v-select v-model="entryStatus" :items="statusOptions" label="Status" density="compact" variant="outlined"
-              style="max-width:200px" @update:model-value="loadEntries" />
+              style="max-width:200px" @update:model-value="onStatusFilter" />
             <v-btn v-if="canWrite" color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
           </div>
           <v-table density="compact">
@@ -65,6 +65,7 @@
               </tr>
             </tbody>
           </v-table>
+          <ListPagination v-model="entryPage" :meta="entriesMeta" />
         </v-window-item>
 
         <!-- TARGETS TAB -->
@@ -151,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { projectsService } from '@/services/projects.service'
 import { entriesService } from '@/services/entries.service'
@@ -161,6 +162,8 @@ import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
 import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
+import ListPagination from '@/components/ListPagination.vue'
+import { usePageQuery } from '@/composables/usePageQuery'
 import { saveFile } from '@/services/download'
 import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
@@ -253,12 +256,21 @@ function isExceeded(t: any): boolean {
   return !!targetProgress.value[t.id]?.is_exceeded
 }
 
+const entryPage = usePageQuery()
+const entriesMeta = ref<any>(null)
+
 async function loadEntries() {
-  const params: any = {}
+  const params: any = { page: entryPage.value }
   if (entryStatus.value) params.status = entryStatus.value
   const res = await entriesService.list(id, params)
   entries.value = res.data
+  entriesMeta.value = res.meta
 }
+
+function onStatusFilter() {
+  entryPage.value === 1 ? loadEntries() : (entryPage.value = 1)
+}
+watch(entryPage, loadEntries)
 
 async function submitEntry(entryId: number) {
   try {

@@ -25,9 +25,10 @@
       </v-col>
       <template v-else>
         <v-col v-if="!projects.length" cols="12">
-          <v-empty-state icon="mdi-folder-open" title="Belum ada project" subtitle="Klik tombol 'Project Baru' untuk mulai." />
+          <v-empty-state v-if="search" icon="mdi-magnify" title="Project tidak ditemukan" subtitle="Tidak ada project yang cocok dengan pencarian." />
+          <v-empty-state v-else icon="mdi-folder-open" title="Belum ada project" subtitle="Klik tombol 'Project Baru' untuk mulai." />
         </v-col>
-        <v-col v-for="p in filteredProjects" :key="p.id" cols="12" md="6" lg="4">
+        <v-col v-for="p in projects" :key="p.id" cols="12" md="6" lg="4">
           <v-card rounded="lg" elevation="1" hover :to="`/projects/${p.id}`">
             <v-card-text>
               <div class="d-flex align-center justify-space-between mb-2">
@@ -48,6 +49,7 @@
         </v-col>
       </template>
     </v-row>
+    <ListPagination v-model="page" :meta="meta" />
 
     <!-- Create Dialog -->
     <v-dialog v-model="dialog" max-width="540">
@@ -88,7 +90,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import ListPagination from '@/components/ListPagination.vue'
+import { usePageQuery } from '@/composables/usePageQuery'
 import { projectsService } from '@/services/projects.service'
 import { getErrorMessage } from '@/services/api'
 import { dashboardService } from '@/services/dashboard.service'
@@ -98,6 +102,8 @@ import { PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const ui = useUiStore()
 const projects = ref<any[]>([])
+const meta = ref<any>(null)
+const page = usePageQuery()
 const loading = ref(false)
 const saving = ref(false)
 const dialog = ref(false)
@@ -105,9 +111,6 @@ const search = ref('')
 const formRef = ref()
 const form = ref({ name: '', code: '', client_name: '', start_date: '', end_date: '' })
 
-const filteredProjects = computed(() =>
-  projects.value.filter(p => p.name.toLowerCase().includes(search.value?.toLowerCase() ?? ''))
-)
 
 function statusColor(status: string) {
   return PROJECT_STATUS_COLORS[status] ?? 'grey'
@@ -117,11 +120,12 @@ async function load() {
   loading.value = true
   try {
     const [pRes, dRes] = await Promise.all([
-      projectsService.list(),
+      projectsService.list({ page: page.value, ...(search.value ? { search: search.value } : {}) }),
       dashboardService.getProjects(),
     ])
     const emissionMap = Object.fromEntries(dRes.map((d: any) => [d.id, d.total_co2e_kg]))
     projects.value = pRes.data.map((p: any) => ({ ...p, total_co2e_kg: emissionMap[p.id] ?? 0 }))
+    meta.value = pRes.meta
   } finally {
     loading.value = false
   }
@@ -143,6 +147,14 @@ async function createProject() {
     saving.value = false
   }
 }
+
+// Pencarian di server (debounce); filter berubah -> kembali ke halaman 1
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { page.value === 1 ? load() : (page.value = 1) }, 300)
+})
+watch(page, load)
 
 onMounted(load)
 </script>

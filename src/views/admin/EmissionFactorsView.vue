@@ -17,8 +17,8 @@
       </tr></thead>
       <tbody>
         <tr v-if="loading"><td colspan="7" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></td></tr>
-        <tr v-else-if="!filtered.length"><td colspan="7" class="text-center pa-4 text-medium-emphasis">Tidak ada data</td></tr>
-        <tr v-for="f in filtered" :key="f.id">
+        <tr v-else-if="!factors.length"><td colspan="7" class="text-center pa-4 text-medium-emphasis">Tidak ada data</td></tr>
+        <tr v-for="f in factors" v-else :key="f.id">
           <td class="font-weight-medium">{{ f.name }}</td>
           <td>{{ f.category?.name }}</td>
           <td>per {{ f.source_unit }}</td>
@@ -32,6 +32,7 @@
         </tr>
       </tbody>
     </v-table>
+    <ListPagination v-model="page" :meta="meta" />
 
     <v-dialog v-model="dialog" max-width="520">
       <v-card rounded="lg">
@@ -60,7 +61,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import ListPagination from '@/components/ListPagination.vue'
+import { usePageQuery } from '@/composables/usePageQuery'
 import { categoriesService } from '@/services/categories.service'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
@@ -77,9 +80,8 @@ const formRef = ref()
 const emptyForm = () => ({ category_id: null, name: '', slug: '', source_unit: '', factor_value: null, source: '' })
 const form = ref(emptyForm())
 
-const filtered = computed(() =>
-  factors.value.filter(f => f.name.toLowerCase().includes(search.value?.toLowerCase() ?? ''))
-)
+const meta = ref<any>(null)
+const page = usePageQuery()
 
 function openDialog(f?: any) {
   editId.value = f?.id ?? null
@@ -118,10 +120,19 @@ async function deactivate(id: number) {
 async function load() {
   loading.value = true
   try {
-    const res = await categoriesService.listFactors({ is_active: undefined })
+    const res = await categoriesService.listFactors({ page: page.value, ...(search.value ? { search: search.value } : {}) })
     factors.value = res.data
+    meta.value = res.meta
   } finally { loading.value = false }
 }
+
+// Pencarian di server (debounce); filter berubah -> kembali ke halaman 1
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { page.value === 1 ? load() : (page.value = 1) }, 300)
+})
+watch(page, load)
 
 onMounted(async () => {
   categories.value = await categoriesService.listCategories()

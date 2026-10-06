@@ -52,6 +52,7 @@
               </tr>
             </tbody>
           </v-table>
+          <div class="px-4 pb-2"><ListPagination v-model="historyPage" :meta="historyMeta" /></div>
         </v-card>
       </v-col>
     </v-row>
@@ -59,9 +60,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { reportsService } from '@/services/reports.service'
 import { saveFile } from '@/services/download'
+import ListPagination from '@/components/ListPagination.vue'
+import { usePageQuery } from '@/composables/usePageQuery'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 import { formatDate } from '@/utils/formatters'
@@ -70,6 +73,8 @@ const ui = useUiStore()
 const generating = ref(false)
 const activeJob = ref<any>(null)
 const history = ref<any[]>([])
+const historyMeta = ref<any>(null)
+const historyPage = usePageQuery()
 const downloadingId = ref<number | null>(null)
 const form = ref({ period_year: new Date().getFullYear(), period_month_from: 1, period_month_to: 12, format: 'xlsx' })
 
@@ -133,13 +138,15 @@ async function download(jobId: number, format?: string, fileName?: string | null
 
 async function loadHistory() {
   try {
-    const res = await reportsService.getHistory()
+    const res = await reportsService.getHistory({ page: historyPage.value })
     history.value = res.data
+    historyMeta.value = res.meta
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal memuat riwayat laporan.'))
   }
 }
 
+watch(historyPage, loadHistory)
 onMounted(loadHistory)
 onUnmounted(() => {
   unmounted = true
