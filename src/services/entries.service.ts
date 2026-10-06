@@ -28,6 +28,10 @@ export const entriesService = {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/approve`)
     return data.data
   },
+  async history(projectId: number, id: number) {
+    const { data } = await api.get(`/projects/${projectId}/entries/${id}/history`)
+    return data.data
+  },
   async reject(projectId: number, id: number, reason: string) {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/reject`, { reason })
     return data.data

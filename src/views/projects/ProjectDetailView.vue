@@ -58,6 +58,7 @@
                   <v-btn v-if="isEditable(e) && canWrite" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" aria-label="Approve entri" @click="approveEntry(e.id)" />
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-close-circle" size="x-small" variant="text" color="error" aria-label="Tolak entri" @click="openReject(e)" />
+                  <v-btn icon="mdi-history" size="x-small" variant="text" aria-label="Riwayat entri" @click="openHistory(e.id)" />
                 </td>
               </tr>
             </tbody>
@@ -125,6 +126,8 @@
       </v-window>
     </template>
 
+    <EntryHistoryDialog v-model="historyDialog" :project-id="id" :entry-id="historyEntryId" />
+
     <v-dialog v-model="rejectDialog" max-width="480">
       <v-card rounded="lg">
         <v-card-title class="pa-5 pb-2">Tolak Entri</v-card-title>
@@ -155,6 +158,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
+import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
 import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
@@ -183,6 +187,13 @@ const canWrite = computed(() =>
   authStore.isAdmin || (authStore.user?.role !== 'viewer' && ['owner', 'member'].includes(myProjectRole.value)))
 function isEditable(e: any): boolean {
   return e.status === 'draft' || e.status === 'rejected'
+}
+
+const historyDialog = ref(false)
+const historyEntryId = ref<number | null>(null)
+function openHistory(entryId: number) {
+  historyEntryId.value = entryId
+  historyDialog.value = true
 }
 
 const rejectDialog = ref(false)

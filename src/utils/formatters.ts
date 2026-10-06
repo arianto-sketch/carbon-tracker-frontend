@@ -10,6 +10,13 @@ export function formatDate(dateStr: string): string {
   })
 }
 
+export function formatDateTime(dateStr: string): string {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
 export function formatNumber(n: number, decimals = 2): string {
   return n.toLocaleString('id-ID', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
