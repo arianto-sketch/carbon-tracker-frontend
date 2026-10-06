@@ -21,9 +21,11 @@ const router = createRouter({
         { path: 'profile', component: () => import('@/views/profile/ProfileView.vue') },
         { path: 'admin/emission-factors', component: () => import('@/views/admin/EmissionFactorsView.vue'), meta: { adminOnly: true } },
         { path: 'admin/users', component: () => import('@/views/admin/UsersView.vue'), meta: { adminOnly: true } },
+        { path: '403', name: 'forbidden', component: () => import('@/views/errors/ForbiddenView.vue') },
+        // URL tidak dikenal: tampilkan 404 (URL tetap) alih-alih diam-diam pindah ke dashboard
+        { path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/errors/NotFoundView.vue') },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
@@ -36,7 +38,7 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
   if (to.meta.guest && auth.isAuthenticated) return '/'
-  if (to.meta.adminOnly && !auth.isAdmin) return '/'
+  if (to.meta.adminOnly && !auth.isAdmin) return '/403'
 })
 
 export default router

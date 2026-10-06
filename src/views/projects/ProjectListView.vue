@@ -25,8 +25,8 @@
       </v-col>
       <template v-else>
         <v-col v-if="!projects.length" cols="12">
-          <v-empty-state v-if="search" icon="mdi-magnify" title="Project tidak ditemukan" subtitle="Tidak ada project yang cocok dengan pencarian." />
-          <v-empty-state v-else icon="mdi-folder-open" title="Belum ada project" subtitle="Klik tombol 'Project Baru' untuk mulai." />
+          <EmptyState v-if="search" icon="mdi-magnify" title="Project tidak ditemukan" text="Tidak ada project yang cocok dengan pencarian." />
+          <EmptyState v-else icon="mdi-folder-open" title="Belum ada project" text="Klik tombol 'Project Baru' untuk mulai." />
         </v-col>
         <v-col v-for="p in projects" :key="p.id" cols="12" md="6" lg="4">
           <v-card rounded="lg" elevation="1" hover :to="`/projects/${p.id}`">
@@ -92,6 +92,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import ListPagination from '@/components/ListPagination.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { projectsService } from '@/services/projects.service'
 import { getErrorMessage } from '@/services/api'

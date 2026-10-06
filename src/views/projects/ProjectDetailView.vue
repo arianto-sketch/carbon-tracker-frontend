@@ -43,7 +43,12 @@
               <th>Jumlah</th><th>Emisi</th><th>Status</th><th>Aksi</th>
             </tr></thead>
             <tbody>
-              <tr v-if="!entries.length"><td colspan="7" class="text-center pa-4 text-medium-emphasis">Belum ada entri</td></tr>
+              <tr v-if="!entries.length">
+                <td colspan="7">
+                  <EmptyState compact icon="mdi-clipboard-text-outline" title="Belum ada entri"
+                    :text="canWrite ? 'Tambahkan entri atau import dari Excel/CSV.' : undefined" />
+                </td>
+              </tr>
               <tr v-for="e in entries" :key="e.id">
                 <td>{{ formatDate(e.entry_date) }}</td>
                 <td>{{ e.category?.name }}</td>
@@ -77,6 +82,10 @@
             <v-btn color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/targets/new`">Tambah Target</v-btn>
           </div>
           <v-row>
+            <v-col v-if="!targets.length" cols="12">
+              <EmptyState compact icon="mdi-target" title="Belum ada target"
+                text="Tetapkan target emisi untuk memantau pemakaian terhadap batas yang direncanakan." />
+            </v-col>
             <v-col v-for="t in targets" :key="t.id" cols="12" md="6">
               <v-card rounded="lg" elevation="1">
                 <v-card-text>
@@ -157,7 +166,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import EmptyState from '@/components/EmptyState.vue'
 import { projectsService } from '@/services/projects.service'
 import { entriesService } from '@/services/entries.service'
 import { targetsService } from '@/services/targets.service'
@@ -173,6 +183,7 @@ import { saveFile } from '@/services/download'
 import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PERIOD_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
+const router = useRouter()
 const id = Number(route.params.id)
 const authStore = useAuthStore()
 const ui = useUiStore()
@@ -309,6 +320,12 @@ onMounted(async () => {
     targets.value = tgt
     targetProgress.value = Object.fromEntries((prog ?? []).map((p: any) => [p.target_id, p]))
     await loadEntries()
+  } catch (e: any) {
+    // Bukan anggota -> halaman 403; project tidak ada -> 404 dengan URL tetap
+    const status = e?.response?.status
+    if (status === 403) return router.replace('/403')
+    if (status === 404) return router.replace({ name: 'not-found', params: { pathMatch: route.path.slice(1).split('/') } })
+    ui.showError(getErrorMessage(e, 'Gagal memuat project.'))
   } finally {
     loading.value = false
   }
