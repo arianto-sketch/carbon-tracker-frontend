@@ -28,6 +28,10 @@ export const entriesService = {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/approve`)
     return data.data
   },
+  async reject(projectId: number, id: number, reason: string) {
+    const { data } = await api.post(`/projects/${projectId}/entries/${id}/reject`, { reason })
+    return data.data
+  },
   async bulk(projectId: number, entries: object[]) {
     const { data } = await api.post(`/projects/${projectId}/entries/bulk`, { entries })
     return data.data

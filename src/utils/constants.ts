@@ -4,12 +4,14 @@ export const ENTRY_STATUS_COLORS: Record<string, string> = {
   draft: 'grey',
   submitted: 'orange',
   approved: 'green',
+  rejected: 'red',
 }
 
 export const ENTRY_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   submitted: 'Menunggu Approval',
   approved: 'Disetujui',
+  rejected: 'Ditolak',
 }
 
 export const PROJECT_STATUS_COLORS: Record<string, string> = {
