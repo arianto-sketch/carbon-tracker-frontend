@@ -29,11 +29,13 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) return '/login'
+  // Ada token tapi profil belum dimuat (mis. hard refresh): muat dulu sebelum cek role.
+  // Jika gagal, fetchMe() sudah memanggil logout() sehingga token terhapus dan cek di bawah mengarah ke /login.
+  if (auth.isAuthenticated && !auth.user) await auth.fetchMe()
+
+  if (to.meta.requiresAuth && !auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
   if (to.meta.guest && auth.isAuthenticated) return '/'
   if (to.meta.adminOnly && !auth.isAdmin) return '/'
-
-  if (auth.isAuthenticated && !auth.user) await auth.fetchMe()
 })
 
 export default router

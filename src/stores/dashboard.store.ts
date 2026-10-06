@@ -33,5 +33,15 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  return { summary, trendData, categoryBreakdown, topEntries, projects, loading, fetchDashboard }
+  // Setup store tidak punya $reset() bawaan — dipanggil saat logout agar user berikutnya tidak melihat data lama.
+  function reset() {
+    summary.value = null
+    trendData.value = []
+    categoryBreakdown.value = []
+    topEntries.value = []
+    projects.value = []
+    loading.value = false
+  }
+
+  return { summary, trendData, categoryBreakdown, topEntries, projects, loading, fetchDashboard, reset }
 })

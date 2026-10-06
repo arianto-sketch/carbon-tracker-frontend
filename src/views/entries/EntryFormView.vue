@@ -101,6 +101,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { categoriesService } from '@/services/categories.service'
 import { entriesService } from '@/services/entries.service'
+import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2 } from '@/utils/formatters'
 
@@ -147,7 +148,7 @@ async function save() {
     }
     router.push(`/projects/${projectId}`)
   } catch (e: any) {
-    ui.showError(e.response?.data?.message ?? 'Gagal menyimpan entri.')
+    ui.showError(getErrorMessage(e, 'Gagal menyimpan entri.'))
   } finally {
     saving.value = false
   }

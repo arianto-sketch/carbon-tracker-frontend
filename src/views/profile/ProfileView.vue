@@ -43,6 +43,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { authService } from '@/services/auth.service'
+import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 
 const authStore = useAuthStore()
@@ -62,7 +63,7 @@ async function saveProfile() {
     const updated = await authService.updateProfile(profileData.value)
     authStore.user = updated
     ui.showSnackbar('Profil berhasil diperbarui.')
-  } catch { ui.showError('Gagal memperbarui profil.') }
+  } catch (e: any) { ui.showError(getErrorMessage(e, 'Gagal memperbarui profil.')) }
   finally { savingProfile.value = false }
 }
 
@@ -75,7 +76,7 @@ async function changePassword() {
     ui.showSnackbar('Password berhasil diubah.')
     pwData.value = { current_password: '', password: '', password_confirmation: '' }
   } catch (e: any) {
-    ui.showError(e.response?.data?.message ?? 'Gagal mengganti password.')
+    ui.showError(getErrorMessage(e, 'Gagal mengganti password.'))
   } finally {
     savingPw.value = false
   }

@@ -90,6 +90,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { projectsService } from '@/services/projects.service'
+import { getErrorMessage } from '@/services/api'
 import { dashboardService } from '@/services/dashboard.service'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
@@ -137,7 +138,7 @@ async function createProject() {
     form.value = { name: '', code: '', client_name: '', start_date: '', end_date: '' }
     await load()
   } catch (e: any) {
-    ui.showError(e.response?.data?.message ?? 'Gagal membuat project.')
+    ui.showError(getErrorMessage(e, 'Gagal membuat project.'))
   } finally {
     saving.value = false
   }
