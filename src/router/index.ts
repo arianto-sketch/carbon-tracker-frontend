@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'reports', component: () => import('@/views/reports/ReportsView.vue') },
         { path: 'profile', component: () => import('@/views/profile/ProfileView.vue') },
         { path: 'admin/emission-factors', component: () => import('@/views/admin/EmissionFactorsView.vue'), meta: { adminOnly: true } },
+        { path: 'admin/users', component: () => import('@/views/admin/UsersView.vue'), meta: { adminOnly: true } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
