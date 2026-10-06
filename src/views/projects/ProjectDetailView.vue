@@ -32,7 +32,10 @@
           <div class="d-flex align-center justify-space-between mb-3">
             <v-select v-model="entryStatus" :items="statusOptions" label="Status" density="compact" variant="outlined"
               style="max-width:200px" @update:model-value="onStatusFilter" />
-            <v-btn v-if="canWrite" color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
+            <div v-if="canWrite" class="d-flex ga-2">
+              <v-btn variant="tonal" prepend-icon="mdi-file-import" @click="importDialog = true">Import</v-btn>
+              <v-btn color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
+            </div>
           </div>
           <v-table density="compact">
             <thead><tr>
@@ -130,6 +133,7 @@
     </template>
 
     <EntryHistoryDialog v-model="historyDialog" :project-id="id" :entry-id="historyEntryId" />
+    <ImportEntriesDialog v-model="importDialog" :project-id="id" @imported="loadEntries" />
 
     <v-dialog v-model="rejectDialog" max-width="480">
       <v-card rounded="lg">
@@ -162,6 +166,7 @@ import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
 import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
+import ImportEntriesDialog from '@/components/ImportEntriesDialog.vue'
 import ListPagination from '@/components/ListPagination.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { saveFile } from '@/services/download'
@@ -204,6 +209,7 @@ async function downloadAttachment(e: any) {
   }
 }
 
+const importDialog = ref(false)
 const historyDialog = ref(false)
 const historyEntryId = ref<number | null>(null)
 function openHistory(entryId: number) {
