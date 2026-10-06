@@ -32,7 +32,7 @@
           <div class="d-flex align-center justify-space-between mb-3">
             <v-select v-model="entryStatus" :items="statusOptions" label="Status" density="compact" variant="outlined"
               style="max-width:200px" @update:model-value="loadEntries" />
-            <v-btn color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
+            <v-btn v-if="canWrite" color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
           </div>
           <v-table density="compact">
             <thead><tr>
@@ -47,11 +47,11 @@
                 <td>{{ e.emission_factor?.name }}</td>
                 <td>{{ e.quantity }} {{ e.source_unit }}</td>
                 <td class="font-weight-bold text-primary">{{ formatCo2(e.co2e_kg) }}</td>
-                <td><v-chip :color="statusColor2(e.status)" size="x-small" variant="tonal">{{ e.status }}</v-chip></td>
+                <td><v-chip :color="statusColor2(e.status)" size="x-small" variant="tonal">{{ ENTRY_STATUS_LABELS[e.status] ?? e.status }}</v-chip></td>
                 <td>
-                  <v-btn v-if="e.status === 'draft'" icon="mdi-pencil" size="x-small" variant="text" :to="`/projects/${id}/entries/${e.id}/edit`" />
-                  <v-btn v-if="e.status === 'draft'" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
-                  <v-btn v-if="e.status === 'submitted' && authStore.isAdmin" icon="mdi-check" size="x-small" variant="text" color="green" @click="approveEntry(e.id)" />
+                  <v-btn v-if="e.status === 'draft' && canWrite" icon="mdi-pencil" size="x-small" variant="text" :to="`/projects/${id}/entries/${e.id}/edit`" />
+                  <v-btn v-if="e.status === 'draft' && canWrite" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
+                  <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" @click="approveEntry(e.id)" />
                 </td>
               </tr>
             </tbody>
@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { projectsService } from '@/services/projects.service'
 import { entriesService } from '@/services/entries.service'
@@ -130,7 +130,8 @@ import { targetsService } from '@/services/targets.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
-import { ENTRY_STATUS_COLORS, PROJECT_STATUS_COLORS } from '@/utils/constants'
+import { getErrorMessage } from '@/services/api'
+import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
 const id = Number(route.params.id)
@@ -148,10 +149,17 @@ const tab = ref('entries')
 const entryStatus = ref('')
 const statusOptions = [
   { title: 'Semua', value: '' },
-  { title: 'Draft', value: 'draft' },
-  { title: 'Submitted', value: 'submitted' },
-  { title: 'Approved', value: 'approved' },
+  ...Object.entries(ENTRY_STATUS_LABELS).map(([value, title]) => ({ title, value })),
 ]
+
+// Aturan sama dengan backend: viewer (project maupun global) hanya bisa membaca;
+// approve oleh owner/admin, tapi tidak untuk entri buatan sendiri.
+const myProjectRole = computed(() => project.value?.current_user_role ?? null)
+const canWrite = computed(() =>
+  authStore.isAdmin || (authStore.user?.role !== 'viewer' && ['owner', 'member'].includes(myProjectRole.value)))
+function canApprove(e: any): boolean {
+  return (authStore.isAdmin || myProjectRole.value === 'owner') && e.created_by?.id !== authStore.user?.id
+}
 
 function statusColor(s: string) { return PROJECT_STATUS_COLORS[s] ?? 'grey' }
 function statusColor2(s: string) { return ENTRY_STATUS_COLORS[s] ?? 'grey' }
@@ -180,7 +188,7 @@ async function submitEntry(entryId: number) {
     await entriesService.submit(id, entryId)
     ui.showSnackbar('Entry berhasil di-submit.')
     await loadEntries()
-  } catch { ui.showError('Gagal submit entry.') }
+  } catch (e: any) { ui.showError(getErrorMessage(e, 'Gagal submit entry.')) }
 }
 
 async function approveEntry(entryId: number) {
@@ -188,7 +196,7 @@ async function approveEntry(entryId: number) {
     await entriesService.approve(id, entryId)
     ui.showSnackbar('Entry berhasil di-approve.')
     await loadEntries()
-  } catch { ui.showError('Gagal approve entry.') }
+  } catch (e: any) { ui.showError(getErrorMessage(e, 'Gagal approve entry.')) }
 }
 
 onMounted(async () => {
