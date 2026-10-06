@@ -1,4 +1,7 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, request, type APIRequestContext, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+
+export const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000/api/v1'
 
 export const USERS = {
   pm: {
@@ -36,4 +39,29 @@ export async function pickSelect(page: Page, label: string, option?: string) {
   await options.first().waitFor()
   await (option ? options.filter({ hasText: option }).first() : options.first()).click()
   await expect(page.locator('.v-overlay--active')).toHaveCount(0) // tunggu menu selesai menutup
+}
+
+/** Token yang disimpan auth.setup di storageState (tidak menambah hitungan rate limit login). */
+export function tokenFromState(statePath: string): string {
+  const state = JSON.parse(readFileSync(statePath, 'utf8'))
+  const token = state.origins.flatMap((o: any) => o.localStorage).find((i: any) => i.name === 'token')?.value
+  if (!token) throw new Error(`Token tidak ditemukan di ${statePath}`)
+  return token
+}
+
+/** Klien API ber-token untuk menyiapkan data uji. Pakai path relatif tanpa '/' di depan, mis. 'projects'. */
+export function apiAs(token: string): Promise<APIRequestContext> {
+  return request.newContext({
+    baseURL: `${API_URL}/`,
+    extraHTTPHeaders: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  })
+}
+
+export async function apiLogin(email: string, password: string): Promise<string> {
+  const ctx = await request.newContext({ baseURL: `${API_URL}/`, extraHTTPHeaders: { Accept: 'application/json' } })
+  const res = await ctx.post('auth/login', { data: { email, password } })
+  expect(res.ok(), await res.text()).toBeTruthy()
+  const token = (await res.json()).data.token
+  await ctx.dispose()
+  return token
 }
