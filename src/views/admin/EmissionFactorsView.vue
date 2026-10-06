@@ -62,6 +62,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { categoriesService } from '@/services/categories.service'
+import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 
 const ui = useUiStore()
@@ -102,7 +103,7 @@ async function save() {
     dialog.value = false
     await load()
   } catch (e: any) {
-    ui.showError(e.response?.data?.message ?? 'Gagal menyimpan.')
+    ui.showError(getErrorMessage(e, 'Gagal menyimpan.'))
   } finally { saving.value = false }
 }
 

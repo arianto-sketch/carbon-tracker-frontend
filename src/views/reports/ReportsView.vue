@@ -24,7 +24,8 @@
             <v-alert v-if="activeJob" class="mt-4" :type="activeJob.status === 'done' ? 'success' : activeJob.status === 'failed' ? 'error' : 'info'" variant="tonal" density="compact">
               <template v-if="activeJob.status === 'done'">
                 Laporan siap!
-                <v-btn size="small" variant="text" color="primary" :href="downloadUrl" target="_blank">Download</v-btn>
+                <v-btn size="small" variant="text" color="primary" :loading="downloadingId === activeJob.job_id"
+                  @click="download(activeJob.job_id, activeJob.format, activeJob.file_name)">Download</v-btn>
               </template>
               <template v-else-if="activeJob.status === 'failed'">Gagal: {{ activeJob.error }}</template>
               <template v-else>Sedang diproses... <v-progress-circular size="16" width="2" indeterminate class="ml-2" /></template>
@@ -46,7 +47,7 @@
                 <td><v-chip :color="j.status === 'done' ? 'green' : j.status === 'failed' ? 'red' : 'orange'" size="x-small" variant="tonal">{{ j.status }}</v-chip></td>
                 <td>
                   <v-btn v-if="j.status === 'done'" icon="mdi-download" size="x-small" variant="text"
-                    :href="`${apiBase}/reports/download/${j.job_id}`" target="_blank" />
+                    :loading="downloadingId === j.job_id" @click="download(j.job_id, j.format, j.file_name)" />
                 </td>
               </tr>
             </tbody>
@@ -60,48 +61,94 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { reportsService } from '@/services/reports.service'
+import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 import { formatDate } from '@/utils/formatters'
-import { API_BASE_URL } from '@/utils/constants'
 
 const ui = useUiStore()
-const apiBase = API_BASE_URL
 const generating = ref(false)
 const activeJob = ref<any>(null)
 const history = ref<any[]>([])
-const downloadUrl = ref('')
-const pollTimer = ref<any>(null)
+const downloadingId = ref<number | null>(null)
 const form = ref({ period_year: new Date().getFullYear(), period_month_from: 1, period_month_to: 12, format: 'xlsx' })
+
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let pollingJobId: number | null = null
+let unmounted = false
 
 async function generate() {
   generating.value = true
   try {
     const job = await reportsService.generate(form.value)
-    activeJob.value = { ...job, status: 'pending' }
+    activeJob.value = { ...job, status: 'pending', format: form.value.format }
     pollStatus(job.job_id)
-  } catch { ui.showError('Gagal generate laporan.') }
-  finally { generating.value = false }
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal generate laporan.'))
+  } finally { generating.value = false }
 }
 
+function stopPolling() {
+  if (pollTimer !== null) clearTimeout(pollTimer)
+  pollTimer = null
+  pollingJobId = null
+}
+
+// Polling berantai (setTimeout) agar request tidak tumpang tindih; generate baru membatalkan polling lama.
 function pollStatus(jobId: number) {
-  pollTimer.value = setInterval(async () => {
-    const status = await reportsService.getStatus(jobId)
-    activeJob.value = status
-    if (status.status === 'done') {
-      downloadUrl.value = `${apiBase}/reports/download/${jobId}`
-      clearInterval(pollTimer.value)
-      await loadHistory()
-    } else if (status.status === 'failed') {
-      clearInterval(pollTimer.value)
+  stopPolling()
+  if (unmounted) return
+  pollingJobId = jobId
+  const tick = async () => {
+    try {
+      const status = await reportsService.getStatus(jobId)
+      if (pollingJobId !== jobId) return
+      activeJob.value = { ...activeJob.value, ...status }
+      if (status.status === 'done' || status.status === 'failed') {
+        stopPolling()
+        await loadHistory()
+        return
+      }
+      pollTimer = setTimeout(tick, 3000)
+    } catch (e: any) {
+      if (pollingJobId !== jobId) return
+      stopPolling()
+      ui.showError(getErrorMessage(e, 'Gagal memeriksa status laporan.'))
     }
-  }, 3000)
+  }
+  pollTimer = setTimeout(tick, 3000)
+}
+
+async function download(jobId: number, format?: string, fileName?: string | null) {
+  downloadingId.value = jobId
+  try {
+    const { blob, filename } = await reportsService.download(jobId, format, fileName)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal mengunduh laporan.'))
+  } finally {
+    downloadingId.value = null
+  }
 }
 
 async function loadHistory() {
-  const res = await reportsService.getHistory()
-  history.value = res.data
+  try {
+    const res = await reportsService.getHistory()
+    history.value = res.data
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal memuat riwayat laporan.'))
+  }
 }
 
 onMounted(loadHistory)
-onUnmounted(() => clearInterval(pollTimer.value))
+onUnmounted(() => {
+  unmounted = true
+  stopPolling()
+})
 </script>

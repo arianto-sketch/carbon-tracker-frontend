@@ -67,18 +67,24 @@
             <v-col v-for="t in targets" :key="t.id" cols="12" md="6">
               <v-card rounded="lg" elevation="1">
                 <v-card-text>
-                  <div class="d-flex justify-space-between mb-2">
+                  <div class="d-flex justify-space-between align-center mb-2">
                     <span class="font-weight-bold">{{ t.category?.name ?? 'Semua Kategori' }}</span>
-                    <span class="text-caption">{{ t.period_type }} {{ t.period_year }}</span>
+                    <div class="d-flex align-center">
+                      <span class="text-caption">{{ t.period_type }} {{ t.period_year }}</span>
+                      <v-btn icon="mdi-pencil" size="x-small" variant="text" class="ml-1"
+                        :to="`/projects/${id}/targets/${t.id}/edit`" aria-label="Edit target" />
+                    </div>
                   </div>
                   <v-progress-linear
                     :model-value="progress(t)"
-                    :color="progress(t) > 100 ? 'error' : 'primary'"
+                    :color="isExceeded(t) ? 'error' : 'primary'"
                     height="8" rounded
                   />
                   <div class="d-flex justify-space-between mt-1 text-caption">
-                    <span>Target: {{ formatCo2(t.target_co2e_kg) }}</span>
-                    <span :class="progress(t) > 100 ? 'text-error' : ''">{{ progress(t).toFixed(1) }}%</span>
+                    <span>Aktual: {{ formatCo2(actual(t)) }} / Target: {{ formatCo2(t.target_co2e_kg) }}</span>
+                    <span :class="isExceeded(t) ? 'text-error font-weight-bold' : ''">
+                      {{ progress(t).toFixed(1) }}%<template v-if="isExceeded(t)"> (melebihi target)</template>
+                    </span>
                   </div>
                 </v-card-text>
               </v-card>
@@ -116,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { projectsService } from '@/services/projects.service'
 import { entriesService } from '@/services/entries.service'
@@ -135,6 +141,7 @@ const project = ref<any>(null)
 const summary = ref<any>(null)
 const entries = ref<any[]>([])
 const targets = ref<any[]>([])
+const targetProgress = ref<Record<number, any>>({})
 const members = ref<any[]>([])
 const loading = ref(true)
 const tab = ref('entries')
@@ -148,9 +155,17 @@ const statusOptions = [
 
 function statusColor(s: string) { return PROJECT_STATUS_COLORS[s] ?? 'grey' }
 function statusColor2(s: string) { return ENTRY_STATUS_COLORS[s] ?? 'grey' }
-function progress(t: any) {
-  const actual = t.actual_co2e_kg ?? 0
-  return t.target_co2e_kg > 0 ? (actual / t.target_co2e_kg) * 100 : 0
+// Nilai aktual & persentase berasal dari endpoint /targets/progress (dipetakan per target_id).
+function actual(t: any): number {
+  return Number(targetProgress.value[t.id]?.actual_co2e_kg ?? 0)
+}
+function progress(t: any): number {
+  const p = targetProgress.value[t.id]
+  if (p?.percentage_used != null) return Number(p.percentage_used)
+  return t.target_co2e_kg > 0 ? (actual(t) / t.target_co2e_kg) * 100 : 0
+}
+function isExceeded(t: any): boolean {
+  return !!targetProgress.value[t.id]?.is_exceeded
 }
 
 async function loadEntries() {
@@ -178,16 +193,18 @@ async function approveEntry(entryId: number) {
 
 onMounted(async () => {
   try {
-    const [proj, sum, mem, tgt] = await Promise.all([
+    const [proj, sum, mem, tgt, prog] = await Promise.all([
       projectsService.get(id),
       projectsService.getSummary(id),
       projectsService.getMembers(id),
       targetsService.list(id),
+      targetsService.getProgress(id),
     ])
     project.value = proj
     summary.value = sum
     members.value = mem
     targets.value = tgt
+    targetProgress.value = Object.fromEntries((prog ?? []).map((p: any) => [p.target_id, p]))
     await loadEntries()
   } finally {
     loading.value = false

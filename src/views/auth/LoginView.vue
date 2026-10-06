@@ -40,11 +40,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { getErrorMessage } from '@/services/api'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 const formRef = ref()
 const showPassword = ref(false)
@@ -57,9 +59,12 @@ async function handleLogin() {
   errorMsg.value = ''
   try {
     await authStore.login(form.value.email, form.value.password)
-    router.push('/')
+    // Kembali ke halaman tujuan semula; hanya path internal (diawali '/', bukan '//').
+    const redirect = route.query.redirect
+    const target = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+    router.push(target)
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.message ?? 'Login gagal. Periksa email dan password.'
+    errorMsg.value = getErrorMessage(e, 'Login gagal. Periksa email dan password.')
   }
 }
 </script>

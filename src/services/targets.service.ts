@@ -5,6 +5,10 @@ export const targetsService = {
     const { data } = await api.get(`/projects/${projectId}/targets`)
     return data.data
   },
+  async get(projectId: number, id: number) {
+    const { data } = await api.get(`/projects/${projectId}/targets/${id}`)
+    return data.data
+  },
   async create(projectId: number, payload: object) {
     const { data } = await api.post(`/projects/${projectId}/targets`, payload)
     return data.data
