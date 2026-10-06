@@ -29,6 +29,21 @@ export const entriesService = {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/approve`)
     return data.data
   },
+  async importTemplate(projectId: number) {
+    return fetchFile(`/projects/${projectId}/entries/import/template`, 'template-import-entri.xlsx')
+  },
+  async importPreview(projectId: number, file: File) {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post(`/projects/${projectId}/entries/import/preview`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data.data
+  },
+  async importCommit(projectId: number, rows: object[]) {
+    const { data } = await api.post(`/projects/${projectId}/entries/import`, { rows })
+    return data.data
+  },
   async uploadAttachment(projectId: number, id: number, file: File) {
     const form = new FormData()
     form.append('file', file)
