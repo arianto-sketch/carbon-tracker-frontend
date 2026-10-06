@@ -5,6 +5,11 @@ export const dashboardService = {
     const { data } = await api.get('/dashboard/summary', { params })
     return data.data
   },
+  // Target tahun berjalan dengan pemakaian >= 80% (tidak mengikuti filter tahun dashboard)
+  async getTargetAlerts() {
+    const { data } = await api.get('/dashboard/target-alerts')
+    return data.data
+  },
   async getProjects(params = {}) {
     const { data } = await api.get('/dashboard/projects', { params })
     return data.data
