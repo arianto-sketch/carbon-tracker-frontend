@@ -166,8 +166,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
+import { useAccessErrorRedirect } from '@/composables/useAccessErrorRedirect'
 import { projectsService } from '@/services/projects.service'
 import { entriesService } from '@/services/entries.service'
 import { targetsService } from '@/services/targets.service'
@@ -183,7 +184,7 @@ import { saveFile } from '@/services/download'
 import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PERIOD_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
-const router = useRouter()
+const handleAccessError = useAccessErrorRedirect()
 const id = Number(route.params.id)
 const authStore = useAuthStore()
 const ui = useUiStore()
@@ -321,11 +322,8 @@ onMounted(async () => {
     targetProgress.value = Object.fromEntries((prog ?? []).map((p: any) => [p.target_id, p]))
     await loadEntries()
   } catch (e: any) {
-    // Bukan anggota -> halaman 403; project tidak ada -> 404 dengan URL tetap
-    const status = e?.response?.status
-    if (status === 403) return router.replace('/403')
-    if (status === 404) return router.replace({ name: 'not-found', params: { pathMatch: route.path.slice(1).split('/') } })
-    ui.showError(getErrorMessage(e, 'Gagal memuat project.'))
+    // Bukan anggota -> /403; project tidak ada -> 404 dengan URL tetap
+    if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat project.'))
   } finally {
     loading.value = false
   }

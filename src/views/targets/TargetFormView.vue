@@ -43,11 +43,14 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { categoriesService } from '@/services/categories.service'
 import { targetsService } from '@/services/targets.service'
+import { projectsService } from '@/services/projects.service'
+import { useAccessErrorRedirect } from '@/composables/useAccessErrorRedirect'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 
 const route = useRoute()
 const router = useRouter()
+const handleAccessError = useAccessErrorRedirect()
 const ui = useUiStore()
 const projectId = Number(route.params.id)
 const targetId = route.params.targetId ? Number(route.params.targetId) : null
@@ -112,7 +115,8 @@ onMounted(async () => {
   try {
     const [cats, target] = await Promise.all([
       categoriesService.listCategories(),
-      isEdit ? targetsService.get(projectId, targetId!) : Promise.resolve(null),
+      // Mode tambah tetap mengecek akses project sejak awal
+      isEdit ? targetsService.get(projectId, targetId!) : projectsService.get(projectId).then(() => null),
     ])
     categories.value = cats
     if (target) {
@@ -127,8 +131,9 @@ onMounted(async () => {
       }
     }
   } catch (e: any) {
+    if (handleAccessError(e)) return
     ui.showError(getErrorMessage(e, isEdit ? 'Gagal memuat data target.' : 'Gagal memuat kategori.'))
-    if (isEdit) router.push(`/projects/${projectId}`)
+    if (isEdit) router.replace(`/projects/${projectId}`)
   } finally {
     loadingTarget.value = false
   }

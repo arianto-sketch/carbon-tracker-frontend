@@ -38,9 +38,24 @@ test.describe('halaman error & empty state', () => {
     await expect(page.getByText('Akses ditolak')).toBeVisible()
   })
 
-  test('project yang tidak ada menampilkan 404', async ({ page }) => {
+  test('project yang tidak ada menampilkan 404 dengan URL tetap', async ({ page }) => {
     await page.goto('/projects/99999999')
     await expect(page.getByText('Halaman tidak ditemukan')).toBeVisible()
+    await expect(page).toHaveURL('/projects/99999999')
+  })
+
+  test('form entri & target di project orang lain menampilkan 403', async ({ page }) => {
+    await page.goto(`/projects/${foreignProjectId}/entries/new`)
+    await expect(page).toHaveURL('/403')
+
+    await page.goto(`/projects/${foreignProjectId}/targets/new`)
+    await expect(page).toHaveURL('/403')
+  })
+
+  test('edit entri yang tidak ada menampilkan 404', async ({ page }) => {
+    await page.goto(`/projects/${emptyProjectId}/entries/99999999/edit`)
+    await expect(page.getByText('Halaman tidak ditemukan')).toBeVisible()
+    await expect(page).toHaveURL(`/projects/${emptyProjectId}/entries/99999999/edit`)
   })
 
   test('project baru menampilkan empty state entri dan target', async ({ page }) => {
