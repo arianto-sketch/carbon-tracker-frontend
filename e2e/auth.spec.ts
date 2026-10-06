@@ -24,6 +24,6 @@ test.describe('non-admin', () => {
 
   test('tidak bisa membuka halaman admin', async ({ page }) => {
     await page.goto('/admin/emission-factors')
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/403')
   })
 })
