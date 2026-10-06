@@ -1,4 +1,4 @@
-import { expect, request, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, request, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 export const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000/api/v1'
@@ -25,20 +25,28 @@ export async function login(page: Page, email: string, password: string) {
   await page.locator('button[type="submit"]').click()
 }
 
+const pageOf = (scope: Page | Locator): Page =>
+  'page' in scope && typeof scope.page === 'function' ? scope.page() : (scope as Page)
+
+/** v-field Vuetify berdasarkan teks label; scope bisa halaman atau area (mis. dialog).
+ *  Locator `has` dievaluasi relatif ke .v-field, jadi harus dibangun dari page, bukan dari scope. */
+const vField = (scope: Page | Locator, label: string) =>
+  scope.locator('.v-field').filter({ has: pageOf(scope).locator(`label:text-is("${label}")`) }).first()
+
 /** Input di dalam v-field Vuetify berdasarkan teks label. */
-export const field = (page: Page, label: string) =>
-  page.locator('.v-field').filter({ has: page.locator(`label:text-is("${label}")`) }).locator('input, textarea').first()
+export const field = (scope: Page | Locator, label: string) => vField(scope, label).locator('input, textarea').first()
 
 /** Pilih opsi pada v-select Vuetify; tanpa `option` memilih opsi pertama. */
-export async function pickSelect(page: Page, label: string, option?: string) {
-  const select = page.locator('.v-field').filter({ has: page.locator(`label:text-is("${label}")`) }).first()
+export async function pickSelect(scope: Page | Locator, label: string, option?: string) {
+  const page = pageOf(scope)
+  const select = vField(scope, label)
   await expect(select).not.toHaveClass(/v-field--disabled/) // mis. Faktor Emisi menunggu Kategori dipilih
   await select.click()
   // role=option saja: saat item masih dimuat, Vuetify menampilkan list-item "No data available"
-  const options = page.locator('.v-overlay--active [role="option"]')
+  const options = page.locator('.v-menu.v-overlay--active [role="option"]')
   await options.first().waitFor()
   await (option ? options.filter({ hasText: option }).first() : options.first()).click()
-  await expect(page.locator('.v-overlay--active')).toHaveCount(0) // tunggu menu selesai menutup
+  await expect(page.locator('.v-menu.v-overlay--active')).toHaveCount(0) // tunggu menu selesai menutup (dialog juga v-overlay)
 }
 
 /** Token yang disimpan auth.setup di storageState (tidak menambah hitungan rate limit login). */
