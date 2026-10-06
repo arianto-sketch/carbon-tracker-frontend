@@ -47,11 +47,17 @@
                 <td>{{ e.emission_factor?.name }}</td>
                 <td>{{ e.quantity }} {{ e.source_unit }}</td>
                 <td class="font-weight-bold text-primary">{{ formatCo2(e.co2e_kg) }}</td>
-                <td><v-chip :color="statusColor2(e.status)" size="x-small" variant="tonal">{{ ENTRY_STATUS_LABELS[e.status] ?? e.status }}</v-chip></td>
                 <td>
-                  <v-btn v-if="e.status === 'draft' && canWrite" icon="mdi-pencil" size="x-small" variant="text" :to="`/projects/${id}/entries/${e.id}/edit`" />
-                  <v-btn v-if="e.status === 'draft' && canWrite" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
-                  <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" @click="approveEntry(e.id)" />
+                  <v-chip :color="statusColor2(e.status)" size="x-small" variant="tonal">{{ ENTRY_STATUS_LABELS[e.status] ?? e.status }}</v-chip>
+                  <div v-if="e.status === 'rejected' && e.rejection_reason" class="text-caption text-error mt-1" style="max-width:240px">
+                    Alasan: {{ e.rejection_reason }}
+                  </div>
+                </td>
+                <td>
+                  <v-btn v-if="isEditable(e) && canWrite" icon="mdi-pencil" size="x-small" variant="text" :to="`/projects/${id}/entries/${e.id}/edit`" />
+                  <v-btn v-if="isEditable(e) && canWrite" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
+                  <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" aria-label="Approve entri" @click="approveEntry(e.id)" />
+                  <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-close-circle" size="x-small" variant="text" color="error" aria-label="Tolak entri" @click="openReject(e)" />
                 </td>
               </tr>
             </tbody>
@@ -118,6 +124,24 @@
         </v-window-item>
       </v-window>
     </template>
+
+    <v-dialog v-model="rejectDialog" max-width="480">
+      <v-card rounded="lg">
+        <v-card-title class="pa-5 pb-2">Tolak Entri</v-card-title>
+        <v-card-text>
+          <p class="text-body-2 mb-3">Entri dikembalikan ke pembuatnya untuk diperbaiki. Jelaskan apa yang perlu diubah.</p>
+          <v-form ref="rejectFormRef">
+            <v-textarea v-model="rejectReason" label="Alasan penolakan" variant="outlined" rows="3" counter="500"
+              :rules="[(v: string) => !!v?.trim() || 'Alasan wajib diisi', (v: string) => (v?.length ?? 0) <= 500 || 'Maksimal 500 karakter']" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="pa-5 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="rejectDialog = false">Batal</v-btn>
+          <v-btn color="error" :loading="rejecting" @click="confirmReject">Tolak</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -157,6 +181,36 @@ const statusOptions = [
 const myProjectRole = computed(() => project.value?.current_user_role ?? null)
 const canWrite = computed(() =>
   authStore.isAdmin || (authStore.user?.role !== 'viewer' && ['owner', 'member'].includes(myProjectRole.value)))
+function isEditable(e: any): boolean {
+  return e.status === 'draft' || e.status === 'rejected'
+}
+
+const rejectDialog = ref(false)
+const rejectFormRef = ref()
+const rejectReason = ref('')
+const rejecting = ref(false)
+let rejectEntryId: number | null = null
+
+function openReject(e: any) {
+  rejectEntryId = e.id
+  rejectReason.value = ''
+  rejectDialog.value = true
+}
+
+async function confirmReject() {
+  const { valid } = await rejectFormRef.value.validate()
+  if (!valid || rejectEntryId === null) return
+  rejecting.value = true
+  try {
+    await entriesService.reject(id, rejectEntryId, rejectReason.value.trim())
+    ui.showSnackbar('Entri ditolak dan dikembalikan ke pembuat.')
+    rejectDialog.value = false
+    await loadEntries()
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal menolak entri.'))
+  } finally { rejecting.value = false }
+}
+
 function canApprove(e: any): boolean {
   return (authStore.isAdmin || myProjectRole.value === 'owner') && e.created_by?.id !== authStore.user?.id
 }
