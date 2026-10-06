@@ -22,6 +22,7 @@
         <template v-if="authStore.isAdmin">
           <v-divider class="my-2" />
           <v-list-item prepend-icon="mdi-cog" title="Emission Factors" to="/admin/emission-factors" />
+          <v-list-item prepend-icon="mdi-account-group" title="Users" to="/admin/users" />
         </template>
       </v-list>
 
