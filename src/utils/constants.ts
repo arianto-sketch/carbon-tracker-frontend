@@ -19,3 +19,10 @@ export const PROJECT_STATUS_COLORS: Record<string, string> = {
   completed: 'blue',
   archived: 'grey',
 }
+
+// Label periode target (dipakai dashboard & daftar target)
+export const PERIOD_LABELS: Record<string, string> = {
+  monthly: 'Bulan',
+  quarterly: 'Kuartal',
+  yearly: 'Tahunan',
+}

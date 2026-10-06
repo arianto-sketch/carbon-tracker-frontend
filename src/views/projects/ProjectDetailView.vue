@@ -83,7 +83,7 @@
                   <div class="d-flex justify-space-between align-center mb-2">
                     <span class="font-weight-bold">{{ t.category?.name ?? 'Semua Kategori' }}</span>
                     <div class="d-flex align-center">
-                      <span class="text-caption">{{ t.period_type }} {{ t.period_year }}</span>
+                      <span class="text-caption">{{ PERIOD_LABELS[t.period_type] ?? t.period_type }}{{ t.period_value ? ` ${t.period_value}` : '' }} {{ t.period_year }}</span>
                       <v-btn icon="mdi-pencil" size="x-small" variant="text" class="ml-1"
                         :to="`/projects/${id}/targets/${t.id}/edit`" aria-label="Edit target" />
                     </div>
@@ -170,7 +170,7 @@ import ImportEntriesDialog from '@/components/ImportEntriesDialog.vue'
 import ListPagination from '@/components/ListPagination.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { saveFile } from '@/services/download'
-import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
+import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PERIOD_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
 const id = Number(route.params.id)

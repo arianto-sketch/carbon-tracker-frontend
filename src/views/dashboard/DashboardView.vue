@@ -62,6 +62,36 @@
       </v-col>
     </v-row>
 
+    <!-- Peringatan Target -->
+    <v-card rounded="lg" elevation="1" class="mb-6">
+      <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
+        <v-icon class="mr-2" :color="store.targetAlerts.length ? 'warning' : 'success'" size="small">
+          {{ store.targetAlerts.length ? 'mdi-alert' : 'mdi-check-circle' }}
+        </v-icon>
+        Peringatan Target {{ new Date().getFullYear() }}
+      </v-card-title>
+      <v-card-text>
+        <p v-if="!store.targetAlerts.length" class="text-body-2 text-medium-emphasis mb-0">
+          Semua target aman — tidak ada target dengan pemakaian di atas 80%.
+        </p>
+        <v-list v-else density="compact" class="py-0">
+          <v-list-item v-for="a in store.targetAlerts" :key="a.target_id" :to="`/projects/${a.project_id}`" class="px-0">
+            <template #prepend>
+              <v-chip :color="a.level === 'exceeded' ? 'error' : 'warning'" size="small" variant="flat" class="mr-3">
+                {{ a.percentage_used.toFixed(1) }}%
+              </v-chip>
+            </template>
+            <v-list-item-title class="text-body-2 font-weight-medium">{{ a.project_name }}</v-list-item-title>
+            <v-list-item-subtitle>
+              {{ a.category }} · {{ PERIOD_LABELS[a.period_type] ?? a.period_type }}{{ a.period_value ? ` ${a.period_value}` : '' }} ·
+              {{ formatCo2(a.actual_co2e_kg) }} dari {{ formatCo2(a.target_co2e_kg) }}
+              <strong v-if="a.level === 'exceeded'" class="text-error"> — melebihi target</strong>
+            </v-list-item-subtitle>
+          </v-list-item>
+        </v-list>
+      </v-card-text>
+    </v-card>
+
     <v-row>
       <!-- Trend Chart -->
       <v-col cols="12" md="8">
@@ -129,6 +159,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useDashboardStore } from '@/stores/dashboard.store'
 import { formatCo2, formatDate, monthLabel } from '@/utils/formatters'
+import { PERIOD_LABELS } from '@/utils/constants'
 
 const store = useDashboardStore()
 const selectedYear = ref(new Date().getFullYear())

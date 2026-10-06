@@ -9,23 +9,26 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const categoryBreakdown = ref<any[]>([])
   const topEntries = ref<any[]>([])
   const projects = ref<any[]>([])
+  const targetAlerts = ref<any[]>([])
   const loading = ref(false)
 
   async function fetchDashboard(params = {}) {
     loading.value = true
     try {
-      const [s, t, c, top, p] = await Promise.all([
+      const [s, t, c, top, p, alerts] = await Promise.all([
         dashboardService.getSummary(params),
         dashboardService.getTrend(params),
         dashboardService.getCategoryBreakdown(params),
         dashboardService.getTopEntries(params),
         dashboardService.getProjects(params),
+        dashboardService.getTargetAlerts(),
       ])
       summary.value = s
       trendData.value = t
       categoryBreakdown.value = c
       topEntries.value = top
       projects.value = p
+      targetAlerts.value = alerts
     } catch {
       useUiStore().showError('Gagal memuat data dashboard.')
     } finally {
@@ -40,8 +43,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     categoryBreakdown.value = []
     topEntries.value = []
     projects.value = []
+    targetAlerts.value = []
     loading.value = false
   }
 
-  return { summary, trendData, categoryBreakdown, topEntries, projects, loading, fetchDashboard, reset }
+  return { summary, trendData, categoryBreakdown, topEntries, projects, targetAlerts, loading, fetchDashboard, reset }
 })
