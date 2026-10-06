@@ -93,6 +93,31 @@
         <v-btn color="primary" :loading="saving" @click="save">Simpan</v-btn>
       </v-card-actions>
     </v-card>
+
+    <v-card v-if="isEdit && entry" rounded="lg" elevation="1" class="mt-4">
+      <v-card-title class="pa-5 pb-2 text-body-1 font-weight-bold">Lampiran Bukti</v-card-title>
+      <v-card-text class="pa-5 pt-0">
+        <div v-if="entry.has_attachment" class="d-flex align-center ga-2 mb-3">
+          <v-icon size="small">mdi-paperclip</v-icon>
+          <span class="text-body-2">{{ entry.attachment_name }}</span>
+          <v-spacer />
+          <v-btn size="small" variant="text" @click="downloadAttachment">Unduh</v-btn>
+          <v-btn v-if="attachmentEditable" size="small" variant="text" color="error" :loading="removingAttachment"
+            @click="removeAttachment">Hapus</v-btn>
+        </div>
+        <p v-else class="text-body-2 text-medium-emphasis mb-3">Belum ada lampiran.</p>
+        <div v-if="attachmentEditable" class="d-flex ga-2 align-start">
+          <v-file-input v-model="attachmentFile" label="Pilih file (PDF/JPG/PNG, maks 5 MB)" accept=".pdf,.jpg,.jpeg,.png"
+            variant="outlined" density="comfortable" prepend-icon="" prepend-inner-icon="mdi-paperclip" show-size
+            :rules="[fileSizeRule]" hide-details="auto" />
+          <v-btn color="primary" variant="tonal" class="mt-1" :disabled="!selectedFile" :loading="uploadingAttachment"
+            @click="uploadAttachment">{{ entry.has_attachment ? 'Ganti' : 'Unggah' }}</v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+    <p v-else-if="!isEdit" class="text-caption text-medium-emphasis mt-3">
+      Lampiran bukti (struk/invoice) bisa ditambahkan setelah entri disimpan, lewat menu Edit.
+    </p>
   </v-container>
 </template>
 
@@ -102,6 +127,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { categoriesService } from '@/services/categories.service'
 import { entriesService } from '@/services/entries.service'
 import { getErrorMessage } from '@/services/api'
+import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2 } from '@/utils/formatters'
 
@@ -115,6 +141,50 @@ const formRef = ref()
 const saving = ref(false)
 const categories = ref<any[]>([])
 const factors = ref<any[]>([])
+const entry = ref<any>(null)
+const attachmentFile = ref<File | File[] | null>(null)
+const uploadingAttachment = ref(false)
+const removingAttachment = ref(false)
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+const selectedFile = computed<File | null>(() =>
+  Array.isArray(attachmentFile.value) ? attachmentFile.value[0] ?? null : attachmentFile.value)
+const attachmentEditable = computed(() => ['draft', 'rejected'].includes(entry.value?.status))
+const fileSizeRule = (v: File | File[] | null) => {
+  const f = Array.isArray(v) ? v[0] : v
+  return !f || f.size <= MAX_ATTACHMENT_BYTES || 'Ukuran file maksimal 5 MB'
+}
+
+async function uploadAttachment() {
+  const file = selectedFile.value
+  if (!file || file.size > MAX_ATTACHMENT_BYTES) return
+  uploadingAttachment.value = true
+  try {
+    entry.value = await entriesService.uploadAttachment(projectId, entryId!, file)
+    attachmentFile.value = null
+    ui.showSnackbar('Lampiran berhasil diunggah.')
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal mengunggah lampiran.'))
+  } finally { uploadingAttachment.value = false }
+}
+
+async function removeAttachment() {
+  removingAttachment.value = true
+  try {
+    entry.value = await entriesService.removeAttachment(projectId, entryId!)
+    ui.showSnackbar('Lampiran dihapus.')
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal menghapus lampiran.'))
+  } finally { removingAttachment.value = false }
+}
+
+async function downloadAttachment() {
+  try {
+    const { blob, filename } = await entriesService.downloadAttachment(projectId, entryId!, entry.value?.attachment_name ?? 'lampiran')
+    saveFile(blob, filename)
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal mengunduh lampiran.'))
+  }
+}
 const form = ref({ category_id: null as number | null, emission_factor_id: null as number | null,
   quantity: null as number | null, entry_date: '', description: '', vendor_name: '', activity_type: '' })
 
@@ -157,15 +227,16 @@ async function save() {
 onMounted(async () => {
   categories.value = await categoriesService.listCategories()
   if (isEdit) {
-    const entry = await entriesService.get(projectId, entryId!)
+    const loaded = await entriesService.get(projectId, entryId!)
+    entry.value = loaded
     form.value = {
-      category_id: entry.category?.id,
-      emission_factor_id: entry.emission_factor?.id,
-      quantity: entry.quantity,
-      entry_date: entry.entry_date,
-      description: entry.description ?? '',
-      vendor_name: entry.vendor_name ?? '',
-      activity_type: entry.activity_type ?? '',
+      category_id: loaded.category?.id,
+      emission_factor_id: loaded.emission_factor?.id,
+      quantity: loaded.quantity,
+      entry_date: loaded.entry_date,
+      description: loaded.description ?? '',
+      vendor_name: loaded.vendor_name ?? '',
+      activity_type: loaded.activity_type ?? '',
     }
     await loadFactors()
   }

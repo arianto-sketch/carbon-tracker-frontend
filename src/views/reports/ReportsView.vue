@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { reportsService } from '@/services/reports.service'
+import { saveFile } from '@/services/download'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
 import { formatDate } from '@/utils/formatters'
@@ -122,14 +123,7 @@ async function download(jobId: number, format?: string, fileName?: string | null
   downloadingId.value = jobId
   try {
     const { blob, filename } = await reportsService.download(jobId, format, fileName)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    saveFile(blob, filename)
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal mengunduh laporan.'))
   } finally {
