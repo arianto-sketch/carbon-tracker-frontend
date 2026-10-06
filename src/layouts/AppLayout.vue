@@ -35,6 +35,12 @@
       </template>
     </v-navigation-drawer>
 
+    <!-- Top bar: notifikasi -->
+    <v-app-bar flat density="compact" color="white" border="b">
+      <v-spacer />
+      <NotificationBell class="mr-2" />
+    </v-app-bar>
+
     <!-- Main -->
     <v-main class="bg-background">
       <router-view />
@@ -55,6 +61,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/auth.service'
 import { useDashboardStore } from './dashboard.store'
+import { useNotificationsStore } from './notifications.store'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<any>(null)
@@ -29,6 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('token')
     useDashboardStore().reset()
+    useNotificationsStore().reset()
   }
 
   async function fetchMe() {
