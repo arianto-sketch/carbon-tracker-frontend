@@ -15,8 +15,8 @@ export const reportsService = {
   async download(jobId: number, format = 'xlsx', fallbackName?: string | null) {
     return fetchFile(`/reports/download/${jobId}`, fallbackName ?? `laporan-${jobId}.${format}`)
   },
-  async getHistory() {
-    const { data } = await api.get('/reports/history')
+  async getHistory(params = {}) {
+    const { data } = await api.get('/reports/history', { params })
     return data
   },
 }
