@@ -126,6 +126,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { categoriesService } from '@/services/categories.service'
 import { entriesService } from '@/services/entries.service'
+import { projectsService } from '@/services/projects.service'
+import { useAccessErrorRedirect } from '@/composables/useAccessErrorRedirect'
 import { getErrorMessage } from '@/services/api'
 import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
@@ -133,6 +135,7 @@ import { formatCo2 } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
+const handleAccessError = useAccessErrorRedirect()
 const ui = useUiStore()
 const projectId = Number(route.params.id)
 const entryId = route.params.entryId ? Number(route.params.entryId) : null
@@ -231,20 +234,31 @@ async function save() {
 }
 
 onMounted(async () => {
-  categories.value = await categoriesService.listCategories()
-  if (isEdit) {
-    const loaded = await entriesService.get(projectId, entryId!)
-    entry.value = loaded
-    form.value = {
-      category_id: loaded.category?.id,
-      emission_factor_id: loaded.emission_factor?.id,
-      quantity: loaded.quantity,
-      entry_date: loaded.entry_date,
-      description: loaded.description ?? '',
-      vendor_name: loaded.vendor_name ?? '',
-      activity_type: loaded.activity_type ?? '',
-    }
-    await loadFactors()
+  try {
+    // Mode tambah juga mengecek akses project sejak awal (sebelumnya baru ketahuan saat simpan)
+    const [cats] = await Promise.all([
+      categoriesService.listCategories(),
+      isEdit ? Promise.resolve(null) : projectsService.get(projectId),
+    ])
+    categories.value = cats
+    if (isEdit) await loadEntry()
+  } catch (e: any) {
+    if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat data entri.'))
   }
 })
+
+async function loadEntry() {
+  const loaded = await entriesService.get(projectId, entryId!)
+  entry.value = loaded
+  form.value = {
+    category_id: loaded.category?.id,
+    emission_factor_id: loaded.emission_factor?.id,
+    quantity: loaded.quantity,
+    entry_date: loaded.entry_date,
+    description: loaded.description ?? '',
+    vendor_name: loaded.vendor_name ?? '',
+    activity_type: loaded.activity_type ?? '',
+  }
+  await loadFactors()
+}
 </script>

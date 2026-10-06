@@ -62,6 +62,6 @@ test.describe('non-admin', () => {
 
   test('tidak bisa membuka halaman users', async ({ page }) => {
     await page.goto('/admin/users')
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/403')
   })
 })
