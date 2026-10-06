@@ -1,4 +1,5 @@
 import api from './api'
+import { fetchFile } from './download'
 
 export const entriesService = {
   async list(projectId: number, params = {}) {
@@ -27,6 +28,22 @@ export const entriesService = {
   async approve(projectId: number, id: number) {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/approve`)
     return data.data
+  },
+  async uploadAttachment(projectId: number, id: number, file: File) {
+    const form = new FormData()
+    form.append('file', file)
+    // Content-Type eksplisit: instance axios default-nya JSON dan akan mengubah FormData menjadi JSON
+    const { data } = await api.post(`/projects/${projectId}/entries/${id}/attachment`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data.data
+  },
+  async removeAttachment(projectId: number, id: number) {
+    const { data } = await api.delete(`/projects/${projectId}/entries/${id}/attachment`)
+    return data.data
+  },
+  async downloadAttachment(projectId: number, id: number, fallbackName: string) {
+    return fetchFile(`/projects/${projectId}/entries/${id}/attachment`, fallbackName)
   },
   async history(projectId: number, id: number) {
     const { data } = await api.get(`/projects/${projectId}/entries/${id}/history`)

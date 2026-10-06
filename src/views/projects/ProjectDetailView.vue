@@ -59,6 +59,8 @@
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" aria-label="Approve entri" @click="approveEntry(e.id)" />
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-close-circle" size="x-small" variant="text" color="error" aria-label="Tolak entri" @click="openReject(e)" />
                   <v-btn icon="mdi-history" size="x-small" variant="text" aria-label="Riwayat entri" @click="openHistory(e.id)" />
+                  <v-btn v-if="e.has_attachment" icon="mdi-paperclip" size="x-small" variant="text"
+                    :aria-label="`Unduh lampiran ${e.attachment_name}`" @click="downloadAttachment(e)" />
                 </td>
               </tr>
             </tbody>
@@ -159,6 +161,7 @@ import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
 import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
+import { saveFile } from '@/services/download'
 import { ENTRY_STATUS_COLORS, ENTRY_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/utils/constants'
 
 const route = useRoute()
@@ -187,6 +190,15 @@ const canWrite = computed(() =>
   authStore.isAdmin || (authStore.user?.role !== 'viewer' && ['owner', 'member'].includes(myProjectRole.value)))
 function isEditable(e: any): boolean {
   return e.status === 'draft' || e.status === 'rejected'
+}
+
+async function downloadAttachment(e: any) {
+  try {
+    const { blob, filename } = await entriesService.downloadAttachment(id, e.id, e.attachment_name ?? 'lampiran')
+    saveFile(blob, filename)
+  } catch (err: any) {
+    ui.showError(getErrorMessage(err, 'Gagal mengunduh lampiran.'))
+  }
 }
 
 const historyDialog = ref(false)
