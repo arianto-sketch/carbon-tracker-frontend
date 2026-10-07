@@ -89,17 +89,28 @@ test.describe('ketahanan UI', () => {
   test.describe('layout mobile 390px', () => {
     test.use({ viewport: { width: 390, height: 844 } })
 
-    test('tanpa scroll horizontal, menu dibuka lewat tombol', async ({ page }) => {
-      for (const path of ['/', '/projects', `/projects/${projectId}`, '/reports']) {
-        await page.goto(path)
+    // Satu test per halaman supaya tiap test singkat dan kegagalan menunjuk halaman yang tepat
+    for (const [label, path] of [['dashboard', () => '/'], ['daftar project', () => '/projects'],
+      ['detail project', () => `/projects/${projectId}`], ['laporan', () => '/reports']] as const) {
+      test(`tanpa scroll horizontal di ${label}`, async ({ page }) => {
+        await page.goto(path())
         await page.waitForLoadState('networkidle')
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-        expect(overflow, `scroll horizontal di ${path}`).toBeLessThanOrEqual(0)
-      }
+        expect(overflow).toBeLessThanOrEqual(0)
+      })
+    }
+
+    test('menu dibuka lewat tombol dan tertutup setelah memilih halaman', async ({ page }) => {
+      await page.goto('/')
+      const drawer = page.locator('nav.v-navigation-drawer')
+      await expect(drawer).not.toHaveClass(/v-navigation-drawer--active/)
 
       await page.getByRole('button', { name: 'Buka menu' }).click()
+      await expect(drawer).toHaveClass(/v-navigation-drawer--active/)
       await page.getByRole('link', { name: 'Projects' }).click()
+
       await expect(page).toHaveURL(/\/projects$/)
+      await expect(drawer).not.toHaveClass(/v-navigation-drawer--active/)
     })
   })
 })
