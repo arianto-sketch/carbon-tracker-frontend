@@ -75,3 +75,12 @@ npx playwright test -g "terunduh sebagai .pdf"
 | Semua spec gagal di `auth.setup.ts` | Backend belum jalan, belum di-seed, atau kena rate limit login. Tunggu semenit lalu ulangi. |
 | Spec memanggil API yang salah | Dev server yang sudah hidup di port 5173 dipakai ulang (`reuseExistingServer`). Pastikan `VITE_API_URL` dev server itu menunjuk ke backend E2E, atau matikan dulu supaya Playwright menyalakan yang baru. |
 | Laporan tidak pernah selesai di `reports.spec.ts` | Backend tidak memakai `QUEUE_CONNECTION=sync` dan tidak ada `queue:work`. |
+
+## CI (GitHub Actions)
+
+| Workflow | Kapan jalan | Isi |
+|---|---|---|
+| `CI` (`.github/workflows/ci.yml`) | Setiap PR dan push ke `main` | Type-check dan build, lalu **E2E penuh** terhadap `master` backend (MySQL 8.4, PHP 8.3) |
+| `Security audit` (`.github/workflows/security-audit.yml`) | PR yang mengubah `package.json`/`package-lock.json`, push ke `main`, dan **setiap Senin** | `npm audit --audit-level=high` |
+
+Laporan HTML Playwright tersimpan sebagai artifact `playwright-report` di setiap run (14 hari). Log backend disimpan sebagai artifact `backend-log` kalau job E2E gagal. Di CI, spec yang gagal diulang sekali dan ditandai *flaky* bila lulus di percobaan kedua.

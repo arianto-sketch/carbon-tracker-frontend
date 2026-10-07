@@ -9,6 +9,9 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   workers: 1, // semua spec berbagi satu database backend
+  forbidOnly: !!process.env.CI,
+  // Di CI: satu kali ulang untuk spec pertama yang kadang gagal saat Vite baru menyala (tetap ditandai "flaky")
+  retries: process.env.CI ? 1 : 0,
   reporter: [
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'playwright-report/results.json' }],
