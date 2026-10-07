@@ -30,11 +30,12 @@ Jalankan dari folder backend, memakai **database khusus E2E**. Spec membuat proj
 
 ```bash
 php artisan migrate:fresh --seed     # di database khusus E2E
-QUEUE_CONNECTION=sync php artisan serve --host=127.0.0.1 --port=8000
+QUEUE_CONNECTION=sync API_RATE_LIMIT=1000 php artisan serve --host=127.0.0.1 --port=8000
 ```
 
 - `--seed` membuat akun yang dipakai spec: `arianto@logique.co.id` (pm) dan `admin@logique.co.id` (admin), password `password`.
 - `QUEUE_CONNECTION=sync` membuat laporan langsung selesai dibuat. Kalau memakai queue database, jalankan `php artisan queue:work`.
+- `API_RATE_LIMIT=1000` dipakai karena akun PM di E2E mendekati batas default backend, yaitu 120 request per menit per user.
 
 ### 2. Jalankan
 

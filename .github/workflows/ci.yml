@@ -43,8 +43,10 @@ jobs:
           --health-timeout=5s
           --health-retries=20
 
-    # Dipakai backend (env menang atas .env); QUEUE sync agar laporan langsung selesai
+    # Dipakai backend (env menang atas .env). QUEUE sync agar laporan langsung selesai;
+    # API_RATE_LIMIT dinaikkan karena akun PM di E2E mendekati batas default 120 request/menit.
     env:
+      API_RATE_LIMIT: 1000
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
