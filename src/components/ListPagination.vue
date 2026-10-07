@@ -9,9 +9,17 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { watch } from 'vue'
+
+const props = defineProps<{
   modelValue: number
   meta: { current_page: number; last_page: number; total: number } | null
 }>()
 const emit = defineEmits<{ 'update:modelValue': [page: number] }>()
+
+// Halaman di luar jangkauan (mis. ?page=999, atau item terakhir di halaman terakhir dihapus):
+// pindah ke halaman terakhir yang ada, bukan menampilkan list kosong tanpa navigasi.
+watch(() => props.meta, (meta) => {
+  if (meta && meta.current_page > meta.last_page) emit('update:modelValue', meta.last_page)
+})
 </script>
