@@ -67,7 +67,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { usersService } from '@/services/users.service'
 import { getErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth.store'
@@ -93,18 +94,22 @@ const emptyForm = () => ({ name: '', email: '', password: '', password_confirmat
 const form = ref(emptyForm())
 const required = (v: any) => !!v || 'Wajib diisi'
 
+const latest = useLatestRequest()
+
 async function load() {
+  const ticket = latest.next()
   loading.value = true
   try {
     const params: Record<string, any> = { page: page.value }
     if (search.value) params.search = search.value
     if (roleFilter.value) params.role = roleFilter.value
     const res = await usersService.list(params)
+    if (!latest.isCurrent(ticket)) return
     users.value = res.data
     meta.value = res.meta
   } catch (e: any) {
-    ui.showError(getErrorMessage(e, 'Gagal memuat user.'))
-  } finally { loading.value = false }
+    if (latest.isCurrent(ticket)) ui.showError(getErrorMessage(e, 'Gagal memuat user.'))
+  } finally { if (latest.isCurrent(ticket)) loading.value = false }
 }
 
 function openDialog(u?: any) {
@@ -144,4 +149,5 @@ watch(roleFilter, () => { page.value === 1 ? load() : (page.value = 1) })
 watch(page, load)
 
 onMounted(load)
+onUnmounted(() => clearTimeout(searchTimer))
 </script>

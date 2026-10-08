@@ -90,9 +90,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import ListPagination from '@/components/ListPagination.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { projectsService } from '@/services/projects.service'
 import { getErrorMessage } from '@/services/api'
@@ -117,18 +118,22 @@ function statusColor(status: string) {
   return PROJECT_STATUS_COLORS[status] ?? 'grey'
 }
 
+const latest = useLatestRequest()
+
 async function load() {
+  const ticket = latest.next()
   loading.value = true
   try {
     const [pRes, dRes] = await Promise.all([
       projectsService.list({ page: page.value, ...(search.value ? { search: search.value } : {}) }),
       dashboardService.getProjects(),
     ])
+    if (!latest.isCurrent(ticket)) return
     const emissionMap = Object.fromEntries(dRes.map((d: any) => [d.id, d.total_co2e_kg]))
     projects.value = pRes.data.map((p: any) => ({ ...p, total_co2e_kg: emissionMap[p.id] ?? 0 }))
     meta.value = pRes.meta
   } finally {
-    loading.value = false
+    if (latest.isCurrent(ticket)) loading.value = false
   }
 }
 
@@ -158,4 +163,5 @@ watch(search, () => {
 watch(page, load)
 
 onMounted(load)
+onUnmounted(() => clearTimeout(searchTimer))
 </script>

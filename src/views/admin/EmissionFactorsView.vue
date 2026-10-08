@@ -61,8 +61,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import ListPagination from '@/components/ListPagination.vue'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { categoriesService } from '@/services/categories.service'
 import { getErrorMessage } from '@/services/api'
@@ -117,13 +118,17 @@ async function deactivate(id: number) {
   } catch { ui.showError('Gagal menonaktifkan.') }
 }
 
+const latest = useLatestRequest()
+
 async function load() {
+  const ticket = latest.next()
   loading.value = true
   try {
     const res = await categoriesService.listFactors({ page: page.value, ...(search.value ? { search: search.value } : {}) })
+    if (!latest.isCurrent(ticket)) return
     factors.value = res.data
     meta.value = res.meta
-  } finally { loading.value = false }
+  } finally { if (latest.isCurrent(ticket)) loading.value = false }
 }
 
 // Pencarian di server (debounce); filter berubah -> kembali ke halaman 1
@@ -138,4 +143,5 @@ onMounted(async () => {
   categories.value = await categoriesService.listCategories()
   await load()
 })
+onUnmounted(() => clearTimeout(searchTimer))
 </script>

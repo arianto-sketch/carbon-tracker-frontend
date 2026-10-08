@@ -73,12 +73,21 @@ async function markAll() {
   }
 }
 
+// Polling dilewati saat tab tersembunyi, lalu langsung memuat ulang saat tab kembali terlihat
+function pollIfVisible() {
+  if (!document.hidden) store.fetch()
+}
+
 // Muat saat awal, berkala, dan tiap pindah halaman; menu dibuka juga memuat ulang
 onMounted(() => {
   store.fetch()
-  timer = setInterval(store.fetch, POLL_MS)
+  timer = setInterval(pollIfVisible, POLL_MS)
+  document.addEventListener('visibilitychange', pollIfVisible)
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  document.removeEventListener('visibilitychange', pollIfVisible)
+})
 watch(() => route.fullPath, () => store.fetch())
 watch(open, isOpen => { if (isOpen) store.fetch() })
 </script>
