@@ -21,6 +21,16 @@
       </v-card-text>
     </v-card>
 
+    <v-card rounded="lg" elevation="1" class="mb-4">
+      <v-card-title class="pa-5 pb-2 text-body-1 font-weight-bold">Notifikasi</v-card-title>
+      <v-card-text class="pa-5 pt-0">
+        <v-switch v-model="emailNotifications" label="Kirim notifikasi email" color="primary" density="comfortable"
+          :loading="savingEmail" :disabled="savingEmail" persistent-hint
+          hint="Email saat entri menunggu approval Anda, disetujui, atau ditolak. Notifikasi di aplikasi tetap muncul."
+          @update:model-value="saveEmailPreference" />
+      </v-card-text>
+    </v-card>
+
     <v-card rounded="lg" elevation="1">
       <v-card-title class="pa-5 pb-2 text-body-1 font-weight-bold">Ganti Password</v-card-title>
       <v-card-text class="pa-5">
@@ -65,6 +75,24 @@ async function saveProfile() {
     ui.showSnackbar('Profil berhasil diperbarui.')
   } catch (e: any) { ui.showError(getErrorMessage(e, 'Gagal memperbarui profil.')) }
   finally { savingProfile.value = false }
+}
+
+// Disimpan langsung saat diubah; nama yang dikirim adalah nama tersimpan, bukan isian form di atas
+const emailNotifications = ref<boolean>(authStore.user?.email_notifications ?? true)
+const savingEmail = ref(false)
+
+async function saveEmailPreference(value: boolean | null) {
+  const enabled = !!value
+  savingEmail.value = true
+  try {
+    authStore.user = await authService.updateProfile({ name: authStore.user.name, email_notifications: enabled })
+    ui.showSnackbar(enabled ? 'Notifikasi email dinyalakan.' : 'Notifikasi email dimatikan.')
+  } catch (e: any) {
+    emailNotifications.value = !enabled
+    ui.showError(getErrorMessage(e, 'Gagal menyimpan preferensi notifikasi.'))
+  } finally {
+    savingEmail.value = false
+  }
 }
 
 async function changePassword() {

@@ -28,6 +28,8 @@
             density="comfortable"
             :rules="[v => !!v || 'Wajib dipilih']"
             :disabled="!form.category_id"
+            :hint="selectedFactor ? scopeLabel(selectedFactor.scope) : ''"
+            persistent-hint
             class="mb-3"
             @update:model-value="updateUnit"
           />
@@ -132,6 +134,7 @@ import { getErrorMessage } from '@/services/api'
 import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2 } from '@/utils/formatters'
+import { scopeLabel } from '@/utils/constants'
 
 const route = useRoute()
 const router = useRouter()

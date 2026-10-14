@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCo2, formatDate, formatNumber, monthLabel } from './formatters'
+import { formatChange, formatCo2, formatDate, formatNumber, monthLabel, monthRangeLabel } from './formatters'
 
 describe('formatCo2', () => {
   it('memakai kg di bawah 1000 kg dan ton mulai 1000 kg', () => {
@@ -28,5 +28,22 @@ describe('monthLabel', () => {
     expect(monthLabel(1)).toBe('Jan')
     expect(monthLabel(8)).toBe('Ags')
     expect(monthLabel(12)).toBe('Des')
+  })
+})
+
+describe('formatChange', () => {
+  it('memberi tanda + untuk kenaikan dan format angka Indonesia', () => {
+    expect(formatChange(300)).toBe('+300,0%')
+    expect(formatChange(-25.46)).toBe('-25,5%')
+    expect(formatChange(0)).toBe('0,0%')
+    expect(formatChange(-0.04)).toBe('0,0%')
+  })
+})
+
+describe('monthRangeLabel', () => {
+  it('menyebut rentang bulan yang dibandingkan', () => {
+    expect(monthRangeLabel(4, 2025)).toBe('Jan–Apr 2025')
+    expect(monthRangeLabel(1, 2025)).toBe('Jan 2025')
+    expect(monthRangeLabel(12, 2025)).toBe('2025')
   })
 })
