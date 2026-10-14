@@ -27,7 +27,9 @@ export function monthLabel(month: number): string {
 
 /** Perubahan persen bertanda, mis. "+300,0%" atau "-25,5%" */
 export function formatChange(pct: number): string {
-  return `${pct > 0 ? '+' : ''}${formatNumber(pct, 1)}%`
+  // Dibulatkan dulu: perubahan sangat kecil tampil "0,0%", bukan "-0,0%"
+  const shown = Math.round(pct * 10) / 10 || 0
+  return `${shown > 0 ? '+' : ''}${formatNumber(shown, 1)}%`
 }
 
 /** Rentang Januari s.d. bulan ke-n: "Jan–Apr 2025", "Jan 2025", atau "2025" bila setahun penuh */

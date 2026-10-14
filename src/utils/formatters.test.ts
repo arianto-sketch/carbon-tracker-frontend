@@ -36,6 +36,7 @@ describe('formatChange', () => {
     expect(formatChange(300)).toBe('+300,0%')
     expect(formatChange(-25.46)).toBe('-25,5%')
     expect(formatChange(0)).toBe('0,0%')
+    expect(formatChange(-0.04)).toBe('0,0%')
   })
 })
 

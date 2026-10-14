@@ -32,12 +32,18 @@
         </v-col>
       </v-row>
 
+      <!-- Ikut tercetak: laporan tidak boleh terlihat lengkap bila ada bagian yang gagal dimuat -->
+      <v-alert v-if="failed.length" type="warning" variant="tonal" density="compact" class="mb-4">
+        Sebagian data gagal dimuat: {{ failed.join(', ') }}. Muat ulang halaman sebelum mencetak.
+      </v-alert>
+
       <section class="mb-6">
         <h2 class="text-subtitle-1 font-weight-bold mb-2">Scope GHG</h2>
         <v-table density="compact">
           <caption class="d-sr-only">Emisi per scope GHG</caption>
           <thead><tr><th>Scope</th><th>Keterangan</th><th class="text-right">Emisi</th><th class="text-right">Entri</th><th class="text-right">%</th></tr></thead>
           <tbody>
+            <tr v-if="failed.includes(SECTIONS.scopes)"><td colspan="5" class="text-medium-emphasis">Data tidak tersedia</td></tr>
             <tr v-for="s in scopes" :key="s.scope">
               <td class="text-no-wrap">Scope {{ s.scope }}</td>
               <td>{{ GHG_SCOPES[s.scope] }}</td>
@@ -47,9 +53,9 @@
             </tr>
             <tr class="font-weight-bold">
               <td colspan="2">Total</td>
-              <td class="text-right text-no-wrap">{{ formatCo2(summary?.total_co2e_kg ?? 0) }}</td>
-              <td class="text-right">{{ summary?.entry_count ?? 0 }}</td>
-              <td class="text-right">{{ summary?.total_co2e_kg ? '100,00' : '0,00' }}</td>
+              <td class="text-right text-no-wrap">{{ summary ? formatCo2(summary.total_co2e_kg) : '-' }}</td>
+              <td class="text-right">{{ summary?.entry_count ?? '-' }}</td>
+              <td class="text-right">{{ summary ? formatNumber(summary.total_co2e_kg ? 100 : 0) : '-' }}</td>
             </tr>
           </tbody>
         </v-table>
@@ -61,7 +67,7 @@
           <caption class="d-sr-only">Emisi per kategori</caption>
           <thead><tr><th>Kategori</th><th class="text-right">Emisi</th><th class="text-right">Entri</th><th class="text-right">%</th></tr></thead>
           <tbody>
-            <tr v-if="!categories.length"><td colspan="4" class="text-medium-emphasis">Belum ada data</td></tr>
+            <tr v-if="!categories.length"><td colspan="4" class="text-medium-emphasis">{{ emptyText(SECTIONS.categories) }}</td></tr>
             <tr v-for="c in categories" :key="c.category_id">
               <td>{{ c.category_name }}</td>
               <td class="text-right text-no-wrap">{{ formatCo2(c.total_co2e_kg) }}</td>
@@ -74,7 +80,8 @@
 
       <section class="mb-6 keep-together">
         <h2 class="text-subtitle-1 font-weight-bold mb-2">Tren bulanan</h2>
-        <apexchart type="bar" height="240" :options="trendOptions" :series="trendSeries" />
+        <p v-if="failed.includes(SECTIONS.trend)" class="text-body-2 text-medium-emphasis">Data tidak tersedia</p>
+        <apexchart v-else type="bar" height="240" :options="trendOptions" :series="trendSeries" />
         <v-table density="compact" class="trend-table">
           <caption class="d-sr-only">Emisi per bulan</caption>
           <thead><tr><th v-for="m in trend" :key="m.month" class="text-right">{{ monthLabel(m.month) }}</th></tr></thead>
@@ -89,7 +96,7 @@
           <caption class="d-sr-only">Emisi per project</caption>
           <thead><tr><th>Project</th><th>Kode</th><th class="text-right">Emisi</th><th class="text-right">Entri</th></tr></thead>
           <tbody>
-            <tr v-if="!projects.length"><td colspan="4" class="text-medium-emphasis">Belum ada data</td></tr>
+            <tr v-if="!projects.length"><td colspan="4" class="text-medium-emphasis">{{ emptyText(SECTIONS.projects) }}</td></tr>
             <tr v-for="p in projects" :key="p.id">
               <td>{{ p.name }}</td>
               <td>{{ p.code }}</td>
@@ -106,7 +113,7 @@
           <caption class="d-sr-only">Entri emisi terbesar</caption>
           <thead><tr><th>Tanggal</th><th>Project</th><th>Faktor emisi</th><th class="text-right">Jumlah</th><th class="text-right">Emisi</th></tr></thead>
           <tbody>
-            <tr v-if="!topEntries.length"><td colspan="5" class="text-medium-emphasis">Belum ada data</td></tr>
+            <tr v-if="!topEntries.length"><td colspan="5" class="text-medium-emphasis">{{ emptyText(SECTIONS.topEntries) }}</td></tr>
             <tr v-for="e in topEntries" :key="e.id">
               <td class="text-no-wrap">{{ formatDate(e.entry_date) }}</td>
               <td>{{ e.project_name }}</td>
@@ -128,13 +135,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLatestRequest } from '@/composables/useLatestRequest'
 import { dashboardService } from '@/services/dashboard.service'
 import { useUiStore } from '@/stores/ui.store'
 import { GHG_SCOPES } from '@/utils/constants'
-import { formatChange, formatCo2, formatDate, formatDateTime, formatNumber, monthLabel, monthRangeLabel } from '@/utils/formatters'
+import { formatChange, formatCo2, formatDate, formatDateTime, formatNumber, monthLabel } from '@/utils/formatters'
+import { comparisonCaption, projectionCaption, type Outlook } from '@/utils/outlook'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,16 +150,33 @@ const ui = useUiStore()
 
 const currentYear = new Date().getFullYear()
 const queryNumber = (value: unknown) => (Number.isInteger(Number(value)) && Number(value) > 0 ? Number(value) : null)
+// Tahun di luar rentang wajar (mis. salah ketik di URL) diganti tahun berjalan
+const queryYear = (value: unknown) => {
+  const y = queryNumber(value)
+  return y !== null && y >= 2000 && y <= currentYear + 1 ? y : null
+}
 
 // Tahun dan project disimpan di URL supaya ringkasan bisa dibagikan atau dibuka ulang
-const year = ref<number>(queryNumber(route.query.year) ?? currentYear)
+const year = ref<number>(queryYear(route.query.year) ?? currentYear)
 const projectId = ref<number | null>(queryNumber(route.query.project_id))
 const years = computed(() => [...new Set([...Array.from({ length: 5 }, (_, i) => currentYear - i), year.value])].sort((a, b) => b - a))
 
+// Nama bagian, dipakai juga di peringatan "gagal dimuat"
+const SECTIONS = {
+  summary: 'Total emisi',
+  outlook: 'Proyeksi',
+  scopes: 'Scope GHG',
+  categories: 'Per kategori',
+  trend: 'Tren bulanan',
+  projects: 'Per project',
+  topEntries: 'Entri emisi terbesar',
+} as const
+
 const loading = ref(true)
+const failed = ref<string[]>([])
 const generatedAt = ref(new Date().toISOString())
 const summary = ref<any>(null)
-const outlook = ref<any>(null)
+const outlook = ref<Outlook | null>(null)
 const scopes = ref<any[]>([])
 const categories = ref<any[]>([])
 const trend = ref<any[]>([])
@@ -160,21 +185,22 @@ const topEntries = ref<any[]>([])
 
 const projectOptions = computed(() => projects.value.map(p => ({ title: `${p.name} (${p.code})`, value: p.id })))
 const selectedProject = computed(() => projects.value.find(p => p.id === projectId.value))
+const emptyText = (section: string) => (failed.value.includes(section) ? 'Data tidak tersedia' : 'Belum ada data')
 
 const kpis = computed(() => {
   const o = outlook.value
   return [
-    { label: 'Total emisi', value: formatCo2(summary.value?.total_co2e_kg ?? 0), note: summary.value?.period ?? '' },
-    { label: 'Entri disetujui', value: String(summary.value?.entry_count ?? 0), note: 'Dihitung dalam ringkasan' },
+    { label: 'Total emisi', value: summary.value ? formatCo2(summary.value.total_co2e_kg) : '-', note: summary.value?.period ?? '' },
+    { label: 'Entri disetujui', value: summary.value ? String(summary.value.entry_count) : '-', note: 'Dihitung dalam ringkasan' },
     {
-      label: o?.months_elapsed >= 12 ? `Total akhir ${year.value}` : `Proyeksi akhir ${year.value}`,
+      label: o && o.months_elapsed >= 12 ? `Total akhir ${year.value}` : `Proyeksi akhir ${year.value}`,
       value: o?.projected_annual_co2e_kg == null ? '-' : formatCo2(o.projected_annual_co2e_kg),
-      note: o?.months_elapsed > 0 && o?.months_elapsed < 12 ? `Run-rate ${o.months_elapsed} bulan` : '',
+      note: o ? projectionCaption(o) : 'Data tidak tersedia',
     },
     {
       label: 'Dibanding tahun lalu',
       value: o?.yoy_change_pct == null ? '-' : formatChange(o.yoy_change_pct),
-      note: o?.yoy_change_pct == null ? `Belum ada data pembanding ${year.value - 1}` : `vs ${monthRangeLabel(o.months_elapsed, year.value - 1)}`,
+      note: o ? comparisonCaption(o) : 'Data tidak tersedia',
     },
   ]
 })
@@ -195,29 +221,40 @@ async function load() {
   const ticket = latest.next()
   loading.value = true
   const filters = { period_year: year.value, ...(projectId.value ? { project_id: projectId.value } : {}) }
-  const results = await Promise.allSettled([
-    dashboardService.getSummary(filters),
-    dashboardService.getOutlook(filters),
-    dashboardService.getScopeBreakdown(filters),
-    dashboardService.getCategoryBreakdown(filters),
-    dashboardService.getTrend(filters),
-    dashboardService.getProjects({ period_year: year.value }),
-    dashboardService.getTopEntries({ ...filters, limit: 10 }),
-  ])
+  const requests: [keyof typeof SECTIONS, Promise<any>][] = [
+    ['summary', dashboardService.getSummary(filters)],
+    ['outlook', dashboardService.getOutlook(filters)],
+    ['scopes', dashboardService.getScopeBreakdown(filters)],
+    ['categories', dashboardService.getCategoryBreakdown(filters)],
+    ['trend', dashboardService.getTrend(filters)],
+    ['projects', dashboardService.getProjects({ period_year: year.value })],
+    ['topEntries', dashboardService.getTopEntries({ ...filters, limit: 10 })],
+  ]
+  const results = await Promise.allSettled(requests.map(([, request]) => request))
   if (!latest.isCurrent(ticket)) return
 
-  const value = (i: number, fallback: any) => (results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<any>).value : fallback)
-  summary.value = value(0, null)
-  outlook.value = value(1, null)
-  scopes.value = value(2, [])
-  categories.value = value(3, [])
-  trend.value = value(4, [])
-  projects.value = value(5, [])
-  topEntries.value = value(6, [])
+  const data: Partial<Record<keyof typeof SECTIONS, any>> = {}
+  const failedNow: string[] = []
+  results.forEach((result, i) => {
+    const key = requests[i][0]
+    if (result.status === 'fulfilled') data[key] = result.value
+    else failedNow.push(SECTIONS[key])
+  })
+  failed.value = failedNow
+  summary.value = data.summary ?? null
+  outlook.value = data.outlook ?? null
+  scopes.value = data.scopes ?? []
+  categories.value = data.categories ?? []
+  trend.value = data.trend ?? []
+  projects.value = data.projects ?? []
+  topEntries.value = data.topEntries ?? []
   generatedAt.value = new Date().toISOString()
   loading.value = false
 
-  if (results.some(r => r.status === 'rejected')) ui.showError('Sebagian data ringkasan gagal dimuat.')
+  if (failedNow.length) ui.showError('Sebagian data ringkasan gagal dimuat.')
+
+  // Project di URL yang tidak bisa diakses: kembali ke semua project (memicu muat ulang)
+  if (projectId.value && data.projects && !selectedProject.value) projectId.value = null
 }
 
 function print() {
@@ -228,11 +265,19 @@ watch([year, projectId], () => {
   router.replace({ query: { year: String(year.value), ...(projectId.value ? { project_id: String(projectId.value) } : {}) } })
   load()
 }, { immediate: true })
+
+// Gaya cetak hanya aktif selama halaman ini terbuka (CSS chunk tetap termuat setelah pindah halaman)
+onMounted(() => document.documentElement.classList.add('print-summary'))
+onBeforeUnmount(() => {
+  document.documentElement.classList.remove('print-summary')
+  latest.next() // respons yang masih berjalan tidak dipakai lagi
+})
 </script>
 
 <style scoped>
 .summary-page {
   max-width: 1100px;
+  page: summary;
 }
 
 .kpi {
@@ -248,37 +293,38 @@ watch([year, projectId], () => {
 </style>
 
 <style>
-/* Halaman cetak: hanya isi ringkasan, tanpa navigasi aplikasi */
-@media print {
-  @page {
-    size: A4;
-    margin: 14mm;
-  }
+/* Halaman cetak: hanya isi ringkasan, tanpa navigasi aplikasi. Semua aturan diawali
+   html.print-summary (kelas dipasang selama halaman ini terbuka) agar tidak berlaku di halaman lain. */
+@page summary {
+  size: A4;
+  margin: 14mm;
+}
 
-  .v-navigation-drawer,
-  .v-app-bar,
-  .v-snackbar,
-  .no-print {
+@media print {
+  html.print-summary .v-navigation-drawer,
+  html.print-summary .v-app-bar,
+  html.print-summary .v-snackbar,
+  html.print-summary .no-print {
     display: none !important;
   }
 
-  .v-main {
+  html.print-summary .v-main {
     padding: 0 !important;
   }
 
   /* Latar abu-abu aplikasi tidak ikut tercetak */
-  .v-application,
-  .v-main {
+  html.print-summary .v-application,
+  html.print-summary .v-main {
     background: #fff !important;
   }
 
-  .summary-page {
+  html.print-summary .summary-page {
     max-width: none;
     padding: 0 !important;
   }
 
-  .summary-page section,
-  .summary-page .kpi {
+  html.print-summary .summary-page section,
+  html.print-summary .summary-page .kpi {
     break-inside: avoid;
   }
 }

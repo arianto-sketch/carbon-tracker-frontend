@@ -40,3 +40,5 @@ export const GHG_SCOPE_OPTIONS = Object.keys(GHG_SCOPES).map(Number).map(scope =
 export function scopeLabel(scope: number): string {
   return `Scope ${scope} · ${GHG_SCOPES[scope] ?? '-'}`
 }
+
+export const GHG_SCOPE_COLORS: Record<number, string> = { 1: 'deep-orange', 2: 'amber-darken-2', 3: 'blue' }

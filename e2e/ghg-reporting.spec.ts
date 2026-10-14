@@ -50,6 +50,14 @@ test.describe('scope GHG faktor emisi (admin)', () => {
 test.describe('pelaporan (pm)', () => {
   test.use({ storageState: USERS.pm.state })
 
+  // Bila test toggle gagal di tengah, email pm dinyalakan lagi supaya run berikutnya tidak ikut gagal
+  test.afterAll(async () => {
+    const pmApi = await apiAs(tokenFromState(USERS.pm.state))
+    const me = (await (await pmApi.get('auth/me')).json()).data
+    if (!me.email_notifications) await pmApi.put('auth/me', { data: { name: me.name, email_notifications: true } })
+    await pmApi.dispose()
+  })
+
   test('form entri menampilkan scope faktor yang dipilih', async ({ page }) => {
     const pmApi = await apiAs(tokenFromState(USERS.pm.state))
     const project = (await (await pmApi.get('projects')).json()).data.find((p: any) => p.current_user_role)
@@ -104,6 +112,31 @@ test.describe('pelaporan (pm)', () => {
     await expect(page.locator('.v-navigation-drawer')).toBeHidden()
     await expect(page.getByRole('button', { name: 'Cetak / Simpan PDF' })).toBeHidden()
     await expect(page.getByRole('heading', { level: 1, name: `Ringkasan Emisi ${year}` })).toBeVisible()
+  })
+
+  test('gaya cetak ringkasan tidak berlaku di halaman lain', async ({ page }) => {
+    await page.goto('/reports/summary')
+    await expect(page.getByRole('heading', { level: 2, name: 'Scope GHG' })).toBeVisible()
+    await page.getByRole('link', { name: 'Kembali' }).click()
+    await expect(page).toHaveURL(/\/reports$/)
+
+    await page.emulateMedia({ media: 'print' })
+    await expect(page.locator('.v-navigation-drawer')).toBeVisible()
+  })
+
+  test('bagian yang gagal dimuat ditandai di ringkasan, bukan dicetak sebagai nol', async ({ page }) => {
+    await page.route((url) => url.pathname.endsWith('/api/v1/dashboard/scope-breakdown'), (route) => route.abort())
+    await page.goto('/reports/summary')
+
+    const warning = page.getByRole('alert').filter({ hasText: 'Sebagian data gagal dimuat' })
+    await expect(warning).toContainText('Scope GHG')
+    await page.emulateMedia({ media: 'print' })
+    await expect(warning).toBeVisible()
+  })
+
+  test('ringkasan mengabaikan tahun yang tidak masuk akal di URL', async ({ page }) => {
+    await page.goto('/reports/summary?year=99999')
+    await expect(page.getByRole('heading', { level: 1, name: `Ringkasan Emisi ${new Date().getFullYear()}` })).toBeVisible()
   })
 
   test('ringkasan mengikuti tahun dari URL', async ({ page }) => {

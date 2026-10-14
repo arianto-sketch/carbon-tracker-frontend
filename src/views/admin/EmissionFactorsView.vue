@@ -21,7 +21,7 @@
         <tr v-for="f in factors" v-else :key="f.id">
           <td class="font-weight-medium">{{ f.name }}</td>
           <td>{{ f.category?.name }}</td>
-          <td class="text-no-wrap" :title="GHG_SCOPES[f.scope]">Scope {{ f.scope }}</td>
+          <td>{{ scopeLabel(f.scope) }}</td>
           <td>per {{ f.source_unit }}</td>
           <td>{{ f.factor_value }}</td>
           <td class="text-caption text-medium-emphasis">{{ f.source }}</td>
@@ -71,7 +71,7 @@ import { usePageQuery } from '@/composables/usePageQuery'
 import { categoriesService } from '@/services/categories.service'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
-import { GHG_SCOPE_OPTIONS, GHG_SCOPES } from '@/utils/constants'
+import { GHG_SCOPE_OPTIONS, scopeLabel } from '@/utils/constants'
 
 const ui = useUiStore()
 const factors = ref<any[]>([])
