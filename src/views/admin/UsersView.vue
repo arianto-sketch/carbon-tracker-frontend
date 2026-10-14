@@ -28,8 +28,8 @@
           <td>{{ ROLE_LABELS[u.role] ?? u.role }}</td>
           <td><v-chip :color="u.is_active ? 'green' : 'grey'" size="x-small" variant="tonal">{{ u.is_active ? 'Aktif' : 'Nonaktif' }}</v-chip></td>
           <td>
-            <v-btn icon="mdi-pencil" size="x-small" variant="text" aria-label="Edit user" @click="openDialog(u)" />
-            <v-btn icon="mdi-history" size="x-small" variant="text" aria-label="Riwayat user" @click="openHistory(u)" />
+            <v-btn icon="mdi-pencil" size="x-small" variant="text" :aria-label="`Edit user ${u.name}`" @click="openDialog(u)" />
+            <v-btn icon="mdi-history" size="x-small" variant="text" :aria-label="`Riwayat user ${u.name}`" @click="openHistory(u)" />
           </td>
         </tr>
       </tbody>
@@ -68,11 +68,13 @@
     </v-dialog>
 
     <!-- Riwayat perubahan nama, role, dan status akun (dicatat backend di audit log) -->
-    <v-dialog v-model="historyDialog" max-width="520">
+    <v-dialog v-model="historyDialog" max-width="520" aria-labelledby="user-history-title">
       <v-card rounded="lg">
-        <v-card-title class="pa-5 pb-2">Riwayat {{ historyUser?.name }}</v-card-title>
+        <v-card-title id="user-history-title" class="pa-5 pb-2">Riwayat {{ historyUser?.name }}</v-card-title>
         <v-card-text>
-          <div v-if="historyLoading" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></div>
+          <div v-if="historyLoading" class="text-center pa-4">
+            <v-progress-circular indeterminate size="24" aria-label="Memuat riwayat" />
+          </div>
           <p v-else-if="!history.length" class="text-body-2 text-medium-emphasis">Belum ada riwayat perubahan.</p>
           <v-list v-else density="compact" class="py-0">
             <v-list-item v-for="h in history" :key="h.id" class="px-0">
@@ -80,7 +82,9 @@
                 {{ h.action === 'created' ? 'Dibuat' : 'Diubah' }} oleh {{ h.user?.name ?? 'sistem' }}
               </v-list-item-title>
               <v-list-item-subtitle>{{ formatDateTime(h.created_at) }}</v-list-item-subtitle>
-              <div v-for="line in changeLines(h)" :key="line" class="text-body-2 mt-1">{{ line }}</div>
+              <ul class="change-lines text-body-2 mt-1">
+                <li v-for="line in changeLines(h)" :key="line">{{ line }}</li>
+              </ul>
             </v-list-item>
           </v-list>
         </v-card-text>
@@ -96,13 +100,14 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useLatestRequest } from '@/composables/useLatestRequest'
-import { usersService } from '@/services/users.service'
+import { usersService, type UserHistoryEntry } from '@/services/users.service'
 import { getErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
 import { formatDateTime } from '@/utils/formatters'
 
 const ROLE_LABELS: Record<string, string> = { admin: 'Admin', pm: 'Project Manager', viewer: 'Viewer' }
+const FIELD_LABELS: Record<string, string> = { name: 'Nama', role: 'Role', is_active: 'Status' }
 const roleOptions = Object.entries(ROLE_LABELS).map(([value, title]) => ({ title, value }))
 const roleFilterOptions = [{ title: 'Semua', value: '' }, ...roleOptions]
 
@@ -125,18 +130,20 @@ const required = (v: any) => !!v || 'Wajib diisi'
 const historyDialog = ref(false)
 const historyLoading = ref(false)
 const historyUser = ref<any>(null)
-const history = ref<any[]>([])
-const FIELD_LABELS: Record<string, string> = { name: 'Nama', role: 'Role', is_active: 'Status' }
+const history = ref<UserHistoryEntry[]>([])
+// Riwayat user lain yang dibuka sebelumnya bisa selesai belakangan: hanya respons terakhir dipakai
+const latestHistory = useLatestRequest()
 
 function fieldValue(field: string, value: unknown): string {
+  if (value === null || value === undefined) return '-'
   if (field === 'role') return ROLE_LABELS[value as string] ?? String(value)
   if (field === 'is_active') return value ? 'Aktif' : 'Nonaktif'
-  return String(value ?? '-')
+  return String(value)
 }
 
 // "Role: Project Manager → Viewer"; saat dibuat (tanpa nilai lama) cukup nilai awalnya
-function changeLines(entry: any): string[] {
-  return Object.entries(entry.changes as Record<string, { old: unknown; new: unknown }>).map(([field, change]) => {
+function changeLines(entry: UserHistoryEntry): string[] {
+  return Object.entries(entry.changes ?? {}).map(([field, change]) => {
     const label = FIELD_LABELS[field] ?? field
     return entry.action === 'created'
       ? `${label}: ${fieldValue(field, change.new)}`
@@ -145,18 +152,23 @@ function changeLines(entry: any): string[] {
 }
 
 async function openHistory(u: any) {
+  const ticket = latestHistory.next()
   historyUser.value = u
   history.value = []
   historyDialog.value = true
   historyLoading.value = true
   try {
-    history.value = await usersService.history(u.id)
+    const entries = await usersService.history(u.id)
+    if (latestHistory.isCurrent(ticket)) history.value = entries
   } catch (e: any) {
-    ui.showError(getErrorMessage(e, 'Gagal memuat riwayat user.'))
+    if (latestHistory.isCurrent(ticket)) ui.showError(getErrorMessage(e, 'Gagal memuat riwayat user.'))
   } finally {
-    historyLoading.value = false
+    if (latestHistory.isCurrent(ticket)) historyLoading.value = false
   }
 }
+
+// Dialog ditutup: respons yang masih berjalan tidak dipakai lagi
+watch(historyDialog, (open) => { if (!open) latestHistory.next() })
 
 const latest = useLatestRequest()
 
@@ -215,3 +227,11 @@ watch(page, load)
 onMounted(load)
 onUnmounted(() => clearTimeout(searchTimer))
 </script>
+
+<style scoped>
+.change-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+</style>
