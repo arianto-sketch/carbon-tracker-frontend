@@ -22,6 +22,15 @@ export const dashboardService = {
     const { data } = await api.get('/dashboard/category-breakdown', { params })
     return data.data
   },
+  async getScopeBreakdown(params = {}) {
+    const { data } = await api.get('/dashboard/scope-breakdown', { params })
+    return data.data
+  },
+  // Total s.d. bulan berjalan, proyeksi run-rate linear, dan pembanding periode sama tahun lalu
+  async getOutlook(params = {}) {
+    const { data } = await api.get('/dashboard/outlook', { params })
+    return data.data
+  },
   async getTopEntries(params = {}) {
     const { data } = await api.get('/dashboard/top-entries', { params })
     return data.data

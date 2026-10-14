@@ -1,19 +1,23 @@
 <template>
   <v-container class="pa-6" fluid>
-    <div class="d-flex align-center justify-space-between mb-6">
+    <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-6">
       <div>
         <h1 class="text-h5 font-weight-bold">Dashboard</h1>
         <p class="text-body-2 text-medium-emphasis">Ringkasan emisi karbon seluruh project</p>
       </div>
-      <v-select
-        v-model="selectedYear"
-        :items="years"
-        label="Tahun"
-        density="compact"
-        variant="outlined"
-        style="max-width: 120px"
-        @update:model-value="load"
-      />
+      <div class="d-flex align-center ga-3">
+        <v-btn variant="tonal" prepend-icon="mdi-printer" :to="`/reports/summary?year=${selectedYear}`">Ringkasan cetak</v-btn>
+        <v-select
+          v-model="selectedYear"
+          :items="years"
+          label="Tahun"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width: 120px"
+          @update:model-value="load"
+        />
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -56,6 +60,52 @@
             </div>
             <div class="text-caption text-medium-emphasis">
               {{ formatCo2(store.categoryBreakdown[0]?.total_co2e_kg ?? 0) }}
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row class="mb-2">
+      <!-- Proyeksi akhir tahun (run-rate linear) dan perbandingan periode sama tahun lalu -->
+      <v-col cols="12" md="6">
+        <v-card rounded="lg" elevation="1" class="h-100" role="region" aria-labelledby="outlook-title">
+          <v-card-title id="outlook-title" class="text-body-1 font-weight-bold pa-4 pb-2">Proyeksi &amp; perbandingan</v-card-title>
+          <v-card-text v-if="outlook">
+            <div class="d-flex flex-wrap ga-6">
+              <div>
+                <div class="text-h6 font-weight-bold">{{ outlook.projected_annual_co2e_kg === null ? '-' : formatCo2(outlook.projected_annual_co2e_kg) }}</div>
+                <div class="text-caption text-medium-emphasis">{{ projectionCaption }}</div>
+              </div>
+              <div>
+                <div class="text-h6 font-weight-bold">{{ formatCo2(outlook.ytd_co2e_kg) }}</div>
+                <div class="text-caption text-medium-emphasis">Total {{ outlook.months_elapsed ? monthRangeLabel(outlook.months_elapsed, outlook.year) : outlook.year }}</div>
+              </div>
+            </div>
+            <div class="mt-3 text-body-2">
+              <span v-if="outlook.yoy_change_pct !== null" :class="outlook.yoy_change_pct > 0 ? 'text-error' : 'text-success'" class="font-weight-medium">
+                <v-icon size="small" :icon="outlook.yoy_change_pct > 0 ? 'mdi-trending-up' : 'mdi-trending-down'" />
+                {{ formatChange(outlook.yoy_change_pct) }} vs {{ monthRangeLabel(outlook.months_elapsed, outlook.previous_year.year) }}
+              </span>
+              <span v-else class="text-medium-emphasis">Belum ada data pembanding {{ outlook.previous_year.year }}</span>
+            </div>
+            <div class="text-caption text-medium-emphasis mt-1">Total {{ outlook.previous_year.year }}: {{ formatCo2(outlook.previous_year.full_year_co2e_kg) }}</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <!-- Emisi per scope GHG Protocol -->
+      <v-col cols="12" md="6">
+        <v-card rounded="lg" elevation="1" class="h-100" role="region" aria-labelledby="scope-title">
+          <v-card-title id="scope-title" class="text-body-1 font-weight-bold pa-4 pb-2">Scope GHG</v-card-title>
+          <v-card-text>
+            <div v-for="s in store.scopeBreakdown" :key="s.scope" class="mb-3">
+              <div class="d-flex justify-space-between text-body-2 mb-1">
+                <span class="font-weight-medium">{{ scopeLabel(s.scope) }}</span>
+                <span class="text-medium-emphasis">{{ formatCo2(s.total_co2e_kg) }} · {{ formatNumber(s.percentage) }}%</span>
+              </div>
+              <v-progress-linear :model-value="s.percentage" :color="SCOPE_COLORS[s.scope]" height="8" rounded
+                :aria-label="`${scopeLabel(s.scope)}: ${formatNumber(s.percentage)}%`" />
             </div>
           </v-card-text>
         </v-card>
@@ -158,10 +208,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useDashboardStore } from '@/stores/dashboard.store'
-import { formatCo2, formatDate, monthLabel } from '@/utils/formatters'
-import { PERIOD_LABELS } from '@/utils/constants'
+import { formatChange, formatCo2, formatDate, formatNumber, monthLabel, monthRangeLabel } from '@/utils/formatters'
+import { PERIOD_LABELS, scopeLabel } from '@/utils/constants'
+
+const SCOPE_COLORS: Record<number, string> = { 1: 'deep-orange', 2: 'amber-darken-2', 3: 'blue' }
 
 const store = useDashboardStore()
+const outlook = computed(() => store.outlook)
+
+// Tahun penuh: proyeksi = total aktual; tahun berjalan: run-rate dari bulan yang sudah lewat
+const projectionCaption = computed(() => {
+  const o = outlook.value
+  if (!o || o.months_elapsed === 0) return `Belum ada data ${o?.year ?? ''}`.trim()
+  return o.months_elapsed >= 12
+    ? `Total akhir ${o.year}`
+    : `Proyeksi akhir ${o.year} (run-rate ${o.months_elapsed} bulan)`
+})
 const selectedYear = ref(new Date().getFullYear())
 const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 

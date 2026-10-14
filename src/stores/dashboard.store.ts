@@ -7,6 +7,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const summary = ref<any>(null)
   const trendData = ref<any[]>([])
   const categoryBreakdown = ref<any[]>([])
+  const scopeBreakdown = ref<any[]>([])
+  const outlook = ref<any>(null)
   const topEntries = ref<any[]>([])
   const projects = ref<any[]>([])
   const targetAlerts = ref<any[]>([])
@@ -19,6 +21,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
       dashboardService.getSummary(params).then(v => { summary.value = v }),
       dashboardService.getTrend(params).then(v => { trendData.value = v }),
       dashboardService.getCategoryBreakdown(params).then(v => { categoryBreakdown.value = v }),
+      dashboardService.getScopeBreakdown(params).then(v => { scopeBreakdown.value = v }),
+      dashboardService.getOutlook(params).then(v => { outlook.value = v }),
       dashboardService.getTopEntries(params).then(v => { topEntries.value = v }),
       dashboardService.getProjects(params).then(v => { projects.value = v }),
       dashboardService.getTargetAlerts().then(v => { targetAlerts.value = v }),
@@ -35,11 +39,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     summary.value = null
     trendData.value = []
     categoryBreakdown.value = []
+    scopeBreakdown.value = []
+    outlook.value = null
     topEntries.value = []
     projects.value = []
     targetAlerts.value = []
     loading.value = false
   }
 
-  return { summary, trendData, categoryBreakdown, topEntries, projects, targetAlerts, loading, fetchDashboard, reset }
+  return { summary, trendData, categoryBreakdown, scopeBreakdown, outlook, topEntries, projects, targetAlerts, loading, fetchDashboard, reset }
 })

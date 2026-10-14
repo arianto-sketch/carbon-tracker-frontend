@@ -26,3 +26,17 @@ export const PERIOD_LABELS: Record<string, string> = {
   quarterly: 'Kuartal',
   yearly: 'Tahunan',
 }
+
+// Scope GHG Protocol per faktor emisi (disalin ke entri saat dicatat)
+export const GHG_SCOPES: Record<number, string> = {
+  1: 'Emisi langsung',
+  2: 'Energi yang dibeli',
+  3: 'Tidak langsung lainnya',
+}
+
+export const GHG_SCOPE_OPTIONS = Object.keys(GHG_SCOPES).map(Number).map(scope => ({ title: scopeLabel(scope), value: scope }))
+
+/** "Scope 2 · Energi yang dibeli" */
+export function scopeLabel(scope: number): string {
+  return `Scope ${scope} · ${GHG_SCOPES[scope] ?? '-'}`
+}

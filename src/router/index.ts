@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'projects/:id/targets/new', component: () => import('@/views/targets/TargetFormView.vue'), meta: { title: 'Target Baru' } },
         { path: 'projects/:id/targets/:targetId/edit', component: () => import('@/views/targets/TargetFormView.vue'), meta: { title: 'Edit Target' } },
         { path: 'reports', component: () => import('@/views/reports/ReportsView.vue'), meta: { title: 'Laporan' } },
+        { path: 'reports/summary', component: () => import('@/views/reports/SummaryView.vue'), meta: { title: 'Ringkasan Emisi' } },
         { path: 'profile', component: () => import('@/views/profile/ProfileView.vue'), meta: { title: 'Profil' } },
         { path: 'admin/emission-factors', component: () => import('@/views/admin/EmissionFactorsView.vue'), meta: { adminOnly: true, title: 'Emission Factors' } },
         { path: 'admin/users', component: () => import('@/views/admin/UsersView.vue'), meta: { adminOnly: true, title: 'Users' } },

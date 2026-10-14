@@ -1,6 +1,10 @@
 <template>
   <v-container class="pa-6" fluid>
-    <h1 class="text-h5 font-weight-bold mb-6">Laporan</h1>
+    <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-6">
+      <h1 class="text-h5 font-weight-bold">Laporan</h1>
+      <!-- Ringkasan berformat halaman cetak; disimpan sebagai PDF lewat dialog cetak browser -->
+      <v-btn variant="tonal" color="primary" prepend-icon="mdi-printer" to="/reports/summary">Ringkasan siap cetak</v-btn>
+    </div>
 
     <v-row>
       <v-col cols="12" md="5">

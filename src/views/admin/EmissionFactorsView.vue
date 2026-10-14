@@ -13,14 +13,15 @@
 
     <v-table density="compact">
       <thead><tr>
-        <th>Nama</th><th>Kategori</th><th>Satuan Input</th><th>Faktor (kg CO₂e)</th><th>Sumber</th><th>Status</th><th>Aksi</th>
+        <th>Nama</th><th>Kategori</th><th>Scope</th><th>Satuan Input</th><th>Faktor (kg CO₂e)</th><th>Sumber</th><th>Status</th><th>Aksi</th>
       </tr></thead>
       <tbody>
-        <tr v-if="loading"><td colspan="7" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></td></tr>
-        <tr v-else-if="!factors.length"><td colspan="7" class="text-center pa-4 text-medium-emphasis">Tidak ada data</td></tr>
+        <tr v-if="loading"><td colspan="8" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></td></tr>
+        <tr v-else-if="!factors.length"><td colspan="8" class="text-center pa-4 text-medium-emphasis">Tidak ada data</td></tr>
         <tr v-for="f in factors" v-else :key="f.id">
           <td class="font-weight-medium">{{ f.name }}</td>
           <td>{{ f.category?.name }}</td>
+          <td class="text-no-wrap" :title="GHG_SCOPES[f.scope]">Scope {{ f.scope }}</td>
           <td>per {{ f.source_unit }}</td>
           <td>{{ f.factor_value }}</td>
           <td class="text-caption text-medium-emphasis">{{ f.source }}</td>
@@ -47,6 +48,8 @@
               <v-col cols="6"><v-text-field v-model="form.source_unit" label="Satuan Input" variant="outlined" density="comfortable" :rules="[v => !!v || 'Wajib']" /></v-col>
               <v-col cols="6"><v-text-field v-model.number="form.factor_value" label="Nilai Faktor" type="number" variant="outlined" density="comfortable" :rules="[v => !!v || 'Wajib']" /></v-col>
             </v-row>
+            <v-select v-model="form.scope" :items="GHG_SCOPE_OPTIONS" label="Scope GHG" variant="outlined" density="comfortable"
+              hint="Entri yang sudah tercatat tetap memakai scope saat dicatat" persistent-hint class="mb-4" />
             <v-text-field v-model="form.source" label="Sumber Data" variant="outlined" density="comfortable" class="mb-2" />
           </v-form>
         </v-card-text>
@@ -68,6 +71,7 @@ import { usePageQuery } from '@/composables/usePageQuery'
 import { categoriesService } from '@/services/categories.service'
 import { getErrorMessage } from '@/services/api'
 import { useUiStore } from '@/stores/ui.store'
+import { GHG_SCOPE_OPTIONS, GHG_SCOPES } from '@/utils/constants'
 
 const ui = useUiStore()
 const factors = ref<any[]>([])
@@ -78,7 +82,7 @@ const saving = ref(false)
 const editId = ref<number | null>(null)
 const search = ref('')
 const formRef = ref()
-const emptyForm = () => ({ category_id: null, name: '', slug: '', source_unit: '', factor_value: null, source: '' })
+const emptyForm = () => ({ category_id: null, name: '', slug: '', source_unit: '', factor_value: null, scope: 3, source: '' })
 const form = ref(emptyForm())
 
 const meta = ref<any>(null)
@@ -87,7 +91,7 @@ const page = usePageQuery()
 function openDialog(f?: any) {
   editId.value = f?.id ?? null
   form.value = f ? { category_id: f.category?.id, name: f.name, slug: f.slug,
-    source_unit: f.source_unit, factor_value: f.factor_value, source: f.source } : emptyForm()
+    source_unit: f.source_unit, factor_value: f.factor_value, scope: f.scope ?? 3, source: f.source } : emptyForm()
   dialog.value = true
 }
 
