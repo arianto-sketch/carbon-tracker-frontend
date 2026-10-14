@@ -158,7 +158,7 @@ async function createProject() {
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(search, () => {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value === 1 ? load() : (page.value = 1) }, 300)
+  searchTimer = setTimeout(() => { if (page.value === 1) load(); else page.value = 1 }, 300)
 })
 watch(page, load)
 

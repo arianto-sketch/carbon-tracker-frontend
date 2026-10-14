@@ -25,7 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    try { await authService.logout() } catch {}
+    try { await authService.logout() } catch { /* token mungkin sudah tidak berlaku; logout lokal tetap dijalankan */ }
     token.value = null
     user.value = null
     localStorage.removeItem('token')
