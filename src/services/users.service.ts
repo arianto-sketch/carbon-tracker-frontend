@@ -13,4 +13,8 @@ export const usersService = {
     const { data } = await api.put(`/users/${id}`, payload)
     return data.data
   },
+  async history(id: number) {
+    const { data } = await api.get(`/users/${id}/history`)
+    return data.data
+  },
 }

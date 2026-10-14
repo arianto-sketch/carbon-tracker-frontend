@@ -27,7 +27,10 @@
           <td>{{ u.email }}</td>
           <td>{{ ROLE_LABELS[u.role] ?? u.role }}</td>
           <td><v-chip :color="u.is_active ? 'green' : 'grey'" size="x-small" variant="tonal">{{ u.is_active ? 'Aktif' : 'Nonaktif' }}</v-chip></td>
-          <td><v-btn icon="mdi-pencil" size="x-small" variant="text" aria-label="Edit user" @click="openDialog(u)" /></td>
+          <td>
+            <v-btn icon="mdi-pencil" size="x-small" variant="text" aria-label="Edit user" @click="openDialog(u)" />
+            <v-btn icon="mdi-history" size="x-small" variant="text" aria-label="Riwayat user" @click="openHistory(u)" />
+          </td>
         </tr>
       </tbody>
     </v-table>
@@ -63,6 +66,30 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Riwayat perubahan nama, role, dan status akun (dicatat backend di audit log) -->
+    <v-dialog v-model="historyDialog" max-width="520">
+      <v-card rounded="lg">
+        <v-card-title class="pa-5 pb-2">Riwayat {{ historyUser?.name }}</v-card-title>
+        <v-card-text>
+          <div v-if="historyLoading" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></div>
+          <p v-else-if="!history.length" class="text-body-2 text-medium-emphasis">Belum ada riwayat perubahan.</p>
+          <v-list v-else density="compact" class="py-0">
+            <v-list-item v-for="h in history" :key="h.id" class="px-0">
+              <v-list-item-title class="text-body-2 font-weight-medium">
+                {{ h.action === 'created' ? 'Dibuat' : 'Diubah' }} oleh {{ h.user?.name ?? 'sistem' }}
+              </v-list-item-title>
+              <v-list-item-subtitle>{{ formatDateTime(h.created_at) }}</v-list-item-subtitle>
+              <div v-for="line in changeLines(h)" :key="line" class="text-body-2 mt-1">{{ line }}</div>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions class="pa-5 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="historyDialog = false">Tutup</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -73,6 +100,7 @@ import { usersService } from '@/services/users.service'
 import { getErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
+import { formatDateTime } from '@/utils/formatters'
 
 const ROLE_LABELS: Record<string, string> = { admin: 'Admin', pm: 'Project Manager', viewer: 'Viewer' }
 const roleOptions = Object.entries(ROLE_LABELS).map(([value, title]) => ({ title, value }))
@@ -93,6 +121,42 @@ const formRef = ref()
 const emptyForm = () => ({ name: '', email: '', password: '', password_confirmation: '', role: 'pm', is_active: true })
 const form = ref(emptyForm())
 const required = (v: any) => !!v || 'Wajib diisi'
+
+const historyDialog = ref(false)
+const historyLoading = ref(false)
+const historyUser = ref<any>(null)
+const history = ref<any[]>([])
+const FIELD_LABELS: Record<string, string> = { name: 'Nama', role: 'Role', is_active: 'Status' }
+
+function fieldValue(field: string, value: unknown): string {
+  if (field === 'role') return ROLE_LABELS[value as string] ?? String(value)
+  if (field === 'is_active') return value ? 'Aktif' : 'Nonaktif'
+  return String(value ?? '-')
+}
+
+// "Role: Project Manager → Viewer"; saat dibuat (tanpa nilai lama) cukup nilai awalnya
+function changeLines(entry: any): string[] {
+  return Object.entries(entry.changes as Record<string, { old: unknown; new: unknown }>).map(([field, change]) => {
+    const label = FIELD_LABELS[field] ?? field
+    return entry.action === 'created'
+      ? `${label}: ${fieldValue(field, change.new)}`
+      : `${label}: ${fieldValue(field, change.old)} → ${fieldValue(field, change.new)}`
+  })
+}
+
+async function openHistory(u: any) {
+  historyUser.value = u
+  history.value = []
+  historyDialog.value = true
+  historyLoading.value = true
+  try {
+    history.value = await usersService.history(u.id)
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal memuat riwayat user.'))
+  } finally {
+    historyLoading.value = false
+  }
+}
 
 const latest = useLatestRequest()
 
