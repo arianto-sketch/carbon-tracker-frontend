@@ -8,7 +8,9 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "lint": "eslint .",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
@@ -21,12 +23,18 @@
     "vuetify": "^3.12.8"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@types/node": "^24.12.3",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-vue": "^10.11.1",
+    "globals": "^17.13.0",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.71.2",
     "vite": "^8.0.12",
+    "vitest": "^5.0.4",
     "vue-tsc": "^3.2.8"
   }
 }

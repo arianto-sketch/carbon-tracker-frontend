@@ -286,7 +286,8 @@ async function loadEntries() {
 }
 
 function onStatusFilter() {
-  entryPage.value === 1 ? loadEntries() : (entryPage.value = 1)
+  if (entryPage.value === 1) loadEntries()
+  else entryPage.value = 1
 }
 watch(entryPage, loadEntries)
 

@@ -18,6 +18,8 @@ cp .env.example .env   # VITE_API_URL=http://127.0.0.1:8000/api/v1
 |---|---|
 | `npm run dev` | Dev server di `http://localhost:5173` |
 | `npm run build` | Type-check (`vue-tsc`) lalu build production ke `dist/` |
+| `npm run lint` | ESLint, fokus ke bug (bukan gaya); `any` hanya peringatan |
+| `npm run test:unit` | Vitest untuk fungsi murni di `src/**/*.test.ts` (parser unduhan, formatter, dll.) |
 | `npm run preview` | Menyajikan hasil build |
 
 ## Test E2E (Playwright)
@@ -81,7 +83,7 @@ npx playwright test -g "terunduh sebagai .pdf"
 
 | Workflow | Kapan jalan | Isi |
 |---|---|---|
-| `CI` (`.github/workflows/ci.yml`) | Setiap PR dan push ke `main` | Type-check dan build, lalu **E2E penuh** terhadap `master` backend (MySQL 8.4, PHP 8.3) |
+| `CI` (`.github/workflows/ci.yml`) | Setiap PR dan push ke `main` | Type-check dan build, ESLint + Vitest, lalu **E2E penuh** terhadap `master` backend (MySQL 8.4, PHP 8.3) |
 | `Security audit` (`.github/workflows/security-audit.yml`) | PR yang mengubah `package.json`/`package-lock.json`, push ke `main`, dan **setiap Senin** | `npm audit --audit-level=high` |
 
 Laporan HTML Playwright tersimpan sebagai artifact `playwright-report` di setiap run (14 hari). Log backend disimpan sebagai artifact `backend-log` kalau job E2E gagal. Di CI, spec yang gagal diulang sekali dan ditandai *flaky* bila lulus di percobaan kedua.
