@@ -16,7 +16,7 @@ test.describe.serial('hak akses project', () => {
 
     const users: Record<string, number> = {}
     for (const [key, email] of [['viewer', viewerEmail], ['member', memberEmail]]) {
-      const res = await adminApi.post('auth/register', {
+      const res = await adminApi.post('users', {
         data: { name: `E2E ${key}`, email, password, password_confirmation: password, role: 'pm' },
       })
       expect(res.ok(), await res.text()).toBeTruthy()
