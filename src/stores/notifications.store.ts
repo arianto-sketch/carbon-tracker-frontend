@@ -1,10 +1,22 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { notificationsService } from '@/services/notifications.service'
 
 export const useNotificationsStore = defineStore('notifications', () => {
-  const items = ref<any[]>([])
+  // Halaman pertama diperbarui oleh polling; halaman lama ditambahkan lewat loadMore() dan tidak
+  // hilang saat polling berikutnya memperbarui halaman pertama.
+  const latest = ref<any[]>([])
+  const older = ref<any[]>([])
   const unreadCount = ref(0)
+  const page = ref(1)
+  const lastPage = ref(1)
+  const loadingMore = ref(false)
+
+  const items = computed(() => {
+    const latestIds = new Set(latest.value.map(n => n.id))
+    return [...latest.value, ...older.value.filter(n => !latestIds.has(n.id))]
+  })
+  const hasMore = computed(() => page.value < lastPage.value)
 
   // Naik setiap kali state lokal lebih baru dari server (tandai dibaca, logout): respons fetch
   // yang dikirim sebelumnya diabaikan supaya tidak menimpa state itu.
@@ -19,10 +31,27 @@ export const useNotificationsStore = defineStore('notifications', () => {
     try {
       const res = await notificationsService.list()
       if (startedAt !== generation) return
-      items.value = res.data
+      latest.value = res.data
       unreadCount.value = res.meta.unread_count
+      lastPage.value = Math.max(res.meta.last_page, page.value)
     } catch { /* abaikan; dicoba lagi pada polling berikutnya */ } finally {
       inFlight = false
+    }
+  }
+
+  async function loadMore() {
+    if (!hasMore.value || loadingMore.value) return
+    loadingMore.value = true
+    const startedAt = generation
+    try {
+      const res = await notificationsService.list({ page: page.value + 1 })
+      if (startedAt !== generation) return
+      older.value = [...older.value, ...res.data]
+      page.value = res.meta.current_page
+      lastPage.value = res.meta.last_page
+      unreadCount.value = res.meta.unread_count
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -45,9 +74,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   function reset() {
     generation++
-    items.value = []
+    latest.value = []
+    older.value = []
     unreadCount.value = 0
+    page.value = 1
+    lastPage.value = 1
   }
 
-  return { items, unreadCount, fetch, markRead, markAllRead, reset }
+  return { items, unreadCount, hasMore, loadingMore, fetch, loadMore, markRead, markAllRead, reset }
 })

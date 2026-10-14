@@ -1,6 +1,6 @@
 <template>
   <v-container class="pa-6 d-flex align-center justify-center" style="min-height: 70vh">
-    <EmptyState icon="mdi-map-marker-question-outline" title="Halaman tidak ditemukan"
+    <EmptyState icon="mdi-map-marker-question-outline" title="Halaman tidak ditemukan" :heading="1" autofocus
       text="Alamat yang Anda buka tidak ada atau datanya sudah dihapus.">
       <v-btn color="primary" to="/" prepend-icon="mdi-view-dashboard">Kembali ke Dashboard</v-btn>
     </EmptyState>

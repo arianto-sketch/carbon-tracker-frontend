@@ -28,6 +28,9 @@
           <v-list-item-subtitle v-if="n.data.reason" class="text-wrap">Alasan: {{ n.data.reason }}</v-list-item-subtitle>
           <v-list-item-subtitle>{{ formatDateTime(n.created_at) }}</v-list-item-subtitle>
         </v-list-item>
+        <div v-if="store.hasMore" class="text-center py-2">
+          <v-btn size="small" variant="text" :loading="store.loadingMore" @click="loadMore">Muat lebih banyak</v-btn>
+        </div>
       </v-list>
     </v-card>
   </v-menu>
@@ -63,6 +66,14 @@ async function openNotification(n: any) {
   }
   open.value = false
   if (n.data.project_id) router.push(`/projects/${n.data.project_id}`)
+}
+
+async function loadMore() {
+  try {
+    await store.loadMore()
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal memuat notifikasi lama.'))
+  }
 }
 
 async function markAll() {
