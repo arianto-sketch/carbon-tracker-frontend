@@ -12,30 +12,39 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const lastPage = ref(1)
   const loadingMore = ref(false)
 
+  // Halaman bisa saling tumpang tindih karena notifikasi baru menggeser offset: tampilkan tiap id
+  // sekali, utamakan salinan dari halaman pertama (paling baru dari server)
   const items = computed(() => {
-    const latestIds = new Set(latest.value.map(n => n.id))
-    return [...latest.value, ...older.value.filter(n => !latestIds.has(n.id))]
+    const seen = new Set<string>()
+    return [...latest.value, ...older.value].filter(n => !seen.has(n.id) && !!seen.add(n.id))
   })
   const hasMore = computed(() => page.value < lastPage.value)
 
   // Naik setiap kali state lokal lebih baru dari server (tandai dibaca, logout): respons fetch
   // yang dikirim sebelumnya diabaikan supaya tidak menimpa state itu.
   let generation = 0
-  let inFlight = false
+  // Generation milik fetch yang sedang berjalan; fetch milik generation lama (mis. sebelum logout)
+  // tidak menghalangi fetch baru
+  let inFlight: number | null = null
 
   // Gagal memuat notifikasi tidak perlu mengganggu user (dipanggil berkala di background)
   async function fetch() {
-    if (inFlight) return
-    inFlight = true
+    if (inFlight === generation) return
     const startedAt = generation
+    inFlight = startedAt
     try {
       const res = await notificationsService.list()
       if (startedAt !== generation) return
+      if (page.value > 1) {
+        // Item yang tergeser keluar dari halaman pertama sudah dimuat user: pindahkan ke halaman lama
+        const freshIds = new Set(res.data.map((n: any) => n.id))
+        older.value = [...latest.value.filter(n => !freshIds.has(n.id)), ...older.value]
+      }
       latest.value = res.data
       unreadCount.value = res.meta.unread_count
       lastPage.value = Math.max(res.meta.last_page, page.value)
     } catch { /* abaikan; dicoba lagi pada polling berikutnya */ } finally {
-      inFlight = false
+      if (inFlight === startedAt) inFlight = null
     }
   }
 
@@ -55,20 +64,28 @@ export const useNotificationsStore = defineStore('notifications', () => {
     }
   }
 
+  // Semua salinan (halaman pertama dan halaman lama), termasuk yang tersembunyi oleh dedupe
+  const copiesOf = (id: string) => [...latest.value, ...older.value].filter(n => n.id === id)
+
   async function markRead(id: string) {
-    const target = items.value.find(n => n.id === id)
-    if (!target || target.read_at) return
+    if (!copiesOf(id).some(n => !n.read_at)) return
+    // Naik sebelum dan sesudah request: fetch yang berjalan selama POST bisa membawa state lama
+    generation++
     const updated = await notificationsService.markRead(id)
     generation++
-    Object.assign(target, updated)
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
+    // Cari ulang setelah await: polling bisa sudah mengganti objeknya
+    const copies = copiesOf(id)
+    const wasUnread = copies.some(n => !n.read_at)
+    copies.forEach(n => Object.assign(n, updated))
+    if (wasUnread) unreadCount.value = Math.max(0, unreadCount.value - 1)
   }
 
   async function markAllRead() {
+    generation++
     await notificationsService.markAllRead()
     generation++
     const now = new Date().toISOString()
-    items.value.forEach(n => { n.read_at ??= now })
+    for (const n of [...latest.value, ...older.value]) n.read_at ??= now
     unreadCount.value = 0
   }
 
