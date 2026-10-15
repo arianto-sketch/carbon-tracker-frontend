@@ -18,6 +18,10 @@
         </v-alert>
 
         <div v-if="loading" class="text-center pa-4"><v-progress-circular indeterminate size="24" aria-label="Memuat nilai" /></div>
+        <div v-else-if="loadError" class="text-center pa-4">
+          <p class="text-body-2 text-medium-emphasis mb-2">Daftar periode gagal dimuat.</p>
+          <v-btn size="small" variant="tonal" @click="load">Muat ulang</v-btn>
+        </div>
         <v-table v-else density="compact" class="mb-4">
           <caption class="d-sr-only">Periode nilai faktor</caption>
           <thead><tr><th>Berlaku</th><th class="text-right">Nilai</th><th>Sumber</th><th class="text-right">Aksi</th></tr></thead>
@@ -26,7 +30,7 @@
               <td class="text-no-wrap">{{ periodLabel(p) }}</td>
               <td class="text-right">
                 <v-text-field v-if="editingId === p.id" v-model.number="editValue" type="number" min="0" step="any"
-                  density="compact" variant="outlined" hide-details :aria-label="`Nilai baru periode mulai ${formatDate(p.valid_from)}`"
+                  density="compact" variant="outlined" :error-messages="editError" :aria-label="`Nilai baru periode mulai ${formatDate(p.valid_from)}`"
                   style="max-width: 140px; margin-left: auto" />
                 <template v-else>{{ formatFactor(p.factor_value) }}</template>
               </td>
@@ -40,7 +44,7 @@
                   <v-btn icon="mdi-pencil" size="x-small" variant="text" :disabled="busy"
                     :aria-label="`Ubah nilai periode mulai ${formatDate(p.valid_from)}`" @click="startEdit(p)" />
                   <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" :disabled="busy || periods.length <= 1"
-                    :aria-label="`Hapus periode mulai ${formatDate(p.valid_from)}`" @click="remove(p)" />
+                    :aria-label="`Hapus periode mulai ${formatDate(p.valid_from)}`" @click="deleting = p" />
                 </template>
               </td>
             </tr>
@@ -71,6 +75,23 @@
         <v-btn variant="text" @click="emit('update:modelValue', false)">Tutup</v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Menghapus periode menghitung ulang draft, jadi dikonfirmasi dulu -->
+    <v-dialog :model-value="!!deleting" max-width="420" aria-labelledby="delete-period-title"
+      @update:model-value="(open: boolean) => { if (!open) deleting = null }">
+      <v-card rounded="lg">
+        <v-card-title id="delete-period-title" class="pa-5 pb-2">Hapus periode?</v-card-title>
+        <v-card-text>
+          Periode mulai {{ deleting ? formatDate(deleting.valid_from) : '' }} dihapus. Entri draft/ditolak pada periode ini akan
+          dihitung ulang dengan nilai periode sebelumnya; entri yang sudah diajukan/disetujui tidak berubah.
+        </v-card-text>
+        <v-card-actions class="pa-5 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="deleting = null">Batal</v-btn>
+          <v-btn color="error" :loading="busy" @click="remove">Hapus</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>
 
@@ -91,7 +112,10 @@ const ui = useUiStore()
 const periods = ref<FactorPeriod[]>([])
 const locked = ref(0)
 const loading = ref(false)
+const loadError = ref(false)
 const busy = ref(false)
+const deleting = ref<FactorPeriod | null>(null)
+const editError = ref('')
 const result = ref<PeriodChange | null>(null)
 const editingId = ref<number | null>(null)
 const editValue = ref<number | null>(null)
@@ -110,13 +134,18 @@ async function load() {
   if (!props.factor) return
   const ticket = latest.next()
   loading.value = true
+  loadError.value = false
   try {
     const res = await categoriesService.factorValues(props.factor.id)
     if (!latest.isCurrent(ticket)) return
     periods.value = res.data
     locked.value = res.meta.locked
   } catch (e: any) {
-    if (latest.isCurrent(ticket)) ui.showError(getErrorMessage(e, 'Gagal memuat nilai faktor.'))
+    if (!latest.isCurrent(ticket)) return
+    // Jangan tampilkan periode lama: tombol ubah/hapus akan memakai id yang tidak lagi sesuai
+    periods.value = []
+    loadError.value = true
+    ui.showError(getErrorMessage(e, 'Gagal memuat nilai faktor.'))
   } finally {
     if (latest.isCurrent(ticket)) loading.value = false
   }
@@ -126,6 +155,9 @@ watch(() => [props.modelValue, props.factor?.id], ([open]) => {
   if (!open) return
   result.value = null
   editingId.value = null
+  deleting.value = null
+  periods.value = []
+  locked.value = 0
   form.value = emptyForm()
   load()
 }, { immediate: true })
@@ -161,18 +193,26 @@ async function add() {
 function startEdit(p: FactorPeriod) {
   editingId.value = p.id
   editValue.value = p.factor_value
+  editError.value = ''
 }
 
 async function saveEdit(p: FactorPeriod) {
-  if (!props.factor || editValue.value === null || editValue.value < 0) return
+  // v-model.number memberi '' untuk isian kosong
+  const value: unknown = editValue.value
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    editError.value = 'Wajib, minimal 0'
+    return
+  }
+  editError.value = ''
+  if (!props.factor) return
   const factorId = props.factor.id
-  const value = editValue.value
   await apply(() => categoriesService.updateFactorValue(factorId, p.id, { factor_value: value }), 'Gagal mengubah nilai.')
 }
 
-async function remove(p: FactorPeriod) {
-  if (!props.factor) return
+async function remove() {
+  const p = deleting.value
+  if (!props.factor || !p) return
   const factorId = props.factor.id
-  await apply(() => categoriesService.deleteFactorValue(factorId, p.id), 'Gagal menghapus periode.')
+  if (await apply(() => categoriesService.deleteFactorValue(factorId, p.id), 'Gagal menghapus periode.')) deleting.value = null
 }
 </script>

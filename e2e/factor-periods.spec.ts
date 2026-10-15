@@ -2,10 +2,21 @@ import { test, expect } from '@playwright/test'
 import { USERS, apiAs, field, pickSelect, tokenFromState, uniqueCode } from './helpers'
 
 // Nilai faktor per periode: entri memakai nilai yang berlaku pada tanggal aktivitasnya.
+// Test admin dan pm memakai faktor yang sama dan berjalan berurutan (serial).
+test.describe.configure({ mode: 'serial' })
+
 const code = uniqueCode('FP')
 const factorName = `Zz Faktor Periode ${code}`
 let factorId = 0
 let projectId = 0
+
+/** Emisi draft uji (10 kg x nilai faktor yang berlaku 1 Maret 2025), dibaca langsung dari API */
+async function draftCo2e(): Promise<number> {
+  const pmApi = await apiAs(tokenFromState(USERS.pm.state))
+  const entries = (await (await pmApi.get(`projects/${projectId}/entries`)).json()).data
+  await pmApi.dispose()
+  return entries[0].co2e_kg
+}
 
 test.beforeAll(async () => {
   const adminApi = await apiAs(tokenFromState(USERS.admin.state))
@@ -28,6 +39,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // Faktor uji dinonaktifkan supaya tidak muncul di form entri spec lain
+  if (!factorId) return
   const adminApi = await apiAs(tokenFromState(USERS.admin.state))
   await adminApi.delete(`emission-factors/${factorId}`)
   await adminApi.dispose()
@@ -43,7 +55,8 @@ test.describe('admin', () => {
 
     const dialog = page.getByRole('dialog', { name: `Nilai ${factorName}` })
     const periods = dialog.getByRole('table', { name: 'Periode nilai faktor' })
-    await expect(periods.getByRole('row').filter({ hasText: 'Sejak awal' })).toContainText('2')
+    const firstRow = periods.getByRole('row').filter({ hasText: 'Sejak awal' })
+    await expect(firstRow.getByRole('cell').nth(1)).toHaveText('2')
 
     await field(dialog, 'Berlaku mulai').fill('2025-01-01')
     await field(dialog, 'Nilai (kg CO₂e per kg)').fill('2.5')
@@ -52,12 +65,18 @@ test.describe('admin', () => {
 
     await expect(dialog.getByText('1 entri draft/ditolak dihitung ulang dengan nilai baru.')).toBeVisible()
     const newRow = periods.getByRole('row').filter({ hasText: '01 Jan 2025' })
-    await expect(newRow).toContainText('2,5')
-    await expect(periods.getByRole('row').filter({ hasText: 'Sejak awal' })).toContainText('31 Des 2024')
+    await expect(newRow.getByRole('cell').nth(1)).toHaveText('2,5')
+    await expect(firstRow).toContainText('Sejak awal – 31 Des 2024')
+    expect(await draftCo2e()).toBe(25)
 
     await newRow.getByRole('button', { name: 'Hapus periode mulai 01 Jan 2025' }).click()
+    const confirm = page.getByRole('dialog', { name: 'Hapus periode?' })
+    await expect(confirm).toContainText('Entri draft/ditolak pada periode ini akan dihitung ulang')
+    await confirm.getByRole('button', { name: 'Hapus' }).click()
+
     await expect(periods.getByRole('row').filter({ hasText: '01 Jan 2025' })).toHaveCount(0)
-    await expect(dialog.getByText('1 entri draft/ditolak dihitung ulang dengan nilai baru.')).toBeVisible()
+    await expect(firstRow).toContainText('Sejak awal – sekarang')
+    await expect.poll(draftCo2e).toBe(20)
   })
 })
 

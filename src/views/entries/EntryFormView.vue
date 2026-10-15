@@ -86,7 +86,7 @@
 
           <v-alert v-if="estimatedCo2 > 0" type="success" variant="tonal" density="compact">
             Estimasi emisi: <strong>{{ formatCo2(estimatedCo2) }}</strong>
-            <div v-if="form.entry_date && factorValueOnDate !== null" class="text-caption">
+            <div v-if="periodsLoaded && form.entry_date && factorValueOnDate !== null" class="text-caption">
               Nilai faktor pada tanggal ini: {{ formatFactor(factorValueOnDate) }} kg CO₂e per {{ selectedUnit }}
             </div>
           </v-alert>
@@ -212,8 +212,10 @@ watch(() => form.value.emission_factor_id, async (id) => {
   try {
     const res = await categoriesService.factorValues(id)
     if (latestPeriods.isCurrent(ticket)) factorPeriods.value = res.data
-  } catch { /* estimasi kembali memakai nilai saat ini */ }
+  } catch { /* estimasi kembali memakai nilai saat ini (keterangan nilai per tanggal tidak ditampilkan) */ }
 }, { immediate: true })
+// Keterangan "nilai pada tanggal ini" hanya bila periode sudah dimuat (bukan nilai saat ini sebagai cadangan)
+const periodsLoaded = computed(() => factorPeriods.value.length > 0)
 const factorValueOnDate = computed(() =>
   valueOn(factorPeriods.value, form.value.entry_date) ?? selectedFactor.value?.factor_value ?? null)
 const estimatedCo2 = computed(() =>
