@@ -12,7 +12,7 @@ const app = createApp(App)
   .use(vuetify)
   .component('apexchart', VueApexCharts)
 
-// Tidak ditunggu: aplikasi tetap tampil walau SDK Sentry gagal dimuat
-initSentry(app).catch(() => undefined)
+// Tidak ditunggu: aplikasi tetap tampil walau SDK Sentry gagal dimuat (mis. diblokir ad blocker)
+initSentry(app).catch((e) => console.warn('Sentry tidak aktif:', e))
 
 app.mount('#app')

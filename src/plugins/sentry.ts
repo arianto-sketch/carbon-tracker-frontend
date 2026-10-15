@@ -14,6 +14,8 @@ export async function initSentry(app: App, dsn: string | undefined = import.meta
     environment: import.meta.env.MODE,
     // Data user, cookie, header, body request, dan query string tidak dikirim (token API ada di header)
     dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false },
+    // Props komponen yang error bisa berisi data user/emisi: tidak dilampirkan
+    attachProps: false,
   })
   return true
 }
