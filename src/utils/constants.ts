@@ -42,3 +42,10 @@ export function scopeLabel(scope: number): string {
 }
 
 export const GHG_SCOPE_COLORS: Record<number, string> = { 1: 'deep-orange', 2: 'amber-darken-2', 3: 'blue' }
+
+// Role anggota di dalam project (berbeda dengan role global user)
+export const PROJECT_ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  member: 'Member',
+  viewer: 'Viewer',
+}

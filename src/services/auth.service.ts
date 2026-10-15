@@ -19,4 +19,13 @@ export const authService = {
   async changePassword(payload: { current_password: string; password: string; password_confirmation: string }) {
     await api.put('/auth/me/password', payload)
   },
+  /** Respons selalu sama, terdaftar atau tidak (email tidak bisa ditebak) */
+  async forgotPassword(email: string): Promise<string> {
+    const { data } = await api.post('/auth/forgot-password', { email })
+    return data.message
+  },
+  async resetPassword(payload: { token: string; email: string; password: string; password_confirmation: string }): Promise<string> {
+    const { data } = await api.post('/auth/reset-password', payload)
+    return data.message
+  },
 }

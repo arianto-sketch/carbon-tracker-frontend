@@ -30,6 +30,8 @@
           <td>
             <v-btn icon="mdi-pencil" size="x-small" variant="text" :aria-label="`Edit user ${u.name}`" @click="openDialog(u)" />
             <v-btn icon="mdi-history" size="x-small" variant="text" :aria-label="`Riwayat user ${u.name}`" @click="openHistory(u)" />
+            <v-btn icon="mdi-lock-reset" size="x-small" variant="text" :aria-label="`Kirim link reset password ${u.name}`"
+              :disabled="!u.is_active" :loading="sendingResetFor === u.id" @click="sendResetLink(u)" />
           </td>
         </tr>
       </tbody>
@@ -79,7 +81,7 @@
           <v-list v-else density="compact" class="py-0">
             <v-list-item v-for="h in history" :key="h.id" class="px-0">
               <v-list-item-title class="text-body-2 font-weight-medium">
-                {{ h.action === 'created' ? 'Dibuat' : 'Diubah' }} oleh {{ h.user?.name ?? 'sistem' }}
+                {{ ACTION_LABELS[h.action] ?? 'Diubah' }} oleh {{ h.user?.name ?? 'sistem' }}
               </v-list-item-title>
               <v-list-item-subtitle>{{ formatDateTime(h.created_at) }}</v-list-item-subtitle>
               <ul class="change-lines text-body-2 mt-1">
@@ -108,6 +110,12 @@ import { formatDateTime } from '@/utils/formatters'
 
 const ROLE_LABELS: Record<string, string> = { admin: 'Admin', pm: 'Project Manager', viewer: 'Viewer' }
 const FIELD_LABELS: Record<string, string> = { name: 'Nama', role: 'Role', is_active: 'Status' }
+const ACTION_LABELS: Record<string, string> = {
+  created: 'Dibuat',
+  updated: 'Diubah',
+  password_reset_link_sent: 'Link reset password dikirim',
+  password_reset: 'Password direset',
+}
 const roleOptions = Object.entries(ROLE_LABELS).map(([value, title]) => ({ title, value }))
 const roleFilterOptions = [{ title: 'Semua', value: '' }, ...roleOptions]
 
@@ -149,6 +157,19 @@ function changeLines(entry: UserHistoryEntry): string[] {
       ? `${label}: ${fieldValue(field, change.new)}`
       : `${label}: ${fieldValue(field, change.old)} → ${fieldValue(field, change.new)}`
   })
+}
+
+const sendingResetFor = ref<number | null>(null)
+
+async function sendResetLink(u: any) {
+  sendingResetFor.value = u.id
+  try {
+    ui.showSnackbar(await usersService.sendPasswordResetLink(u.id))
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal mengirim link reset password.'))
+  } finally {
+    sendingResetFor.value = null
+  }
 }
 
 async function openHistory(u: any) {

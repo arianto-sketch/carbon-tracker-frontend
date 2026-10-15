@@ -7,6 +7,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: () => import('@/views/auth/LoginView.vue'), meta: { guest: true, title: 'Masuk' } },
+    { path: '/forgot-password', component: () => import('@/views/auth/ForgotPasswordView.vue'), meta: { guest: true, title: 'Lupa password' } },
+    // Bukan "guest": user yang masih login (mis. sesi lama) tetap bisa memakai link reset dari email;
+    // redirect ke dashboard akan menghilangkan token di fragment
+    { path: '/reset-password', component: () => import('@/views/auth/ResetPasswordView.vue'), meta: { title: 'Atur password baru' } },
     {
       path: '/',
       component: () => import('@/layouts/AppLayout.vue'),

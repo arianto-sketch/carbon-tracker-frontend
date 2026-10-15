@@ -116,12 +116,7 @@
 
         <!-- MEMBERS TAB -->
         <v-window-item value="members">
-          <v-list>
-            <v-list-item v-for="m in members" :key="m.id" :subtitle="m.role">
-              <template #prepend><v-avatar color="primary" size="36"><span class="text-white">{{ m.user?.name?.[0] }}</span></v-avatar></template>
-              <template #title>{{ m.user?.name }}</template>
-            </v-list-item>
-          </v-list>
+          <ProjectMembersPanel :project-id="id" :members="members" :can-manage="canManage" :reload="reloadMembers" />
         </v-window-item>
 
         <!-- SUMMARY TAB -->
@@ -178,6 +173,7 @@ import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
 import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
 import ImportEntriesDialog from '@/components/ImportEntriesDialog.vue'
+import ProjectMembersPanel from '@/components/ProjectMembersPanel.vue'
 import ListPagination from '@/components/ListPagination.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { saveFile } from '@/services/download'
@@ -208,6 +204,19 @@ const statusOptions = [
 const myProjectRole = computed(() => project.value?.current_user_role ?? null)
 const canWrite = computed(() =>
   authStore.isAdmin || (authStore.user?.role !== 'viewer' && ['owner', 'member'].includes(myProjectRole.value)))
+// current_user_role dari backend sudah memperhitungkan role global Viewer
+const canManage = computed(() => authStore.isAdmin || myProjectRole.value === 'owner')
+
+// Setelah anggota berubah: role user sendiri bisa ikut berubah (mis. owner menurunkan dirinya)
+async function reloadMembers() {
+  try {
+    const [proj, mem] = await Promise.all([projectsService.get(id), projectsService.getMembers(id)])
+    project.value = proj
+    members.value = mem
+  } catch (e: any) {
+    if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat anggota.'))
+  }
+}
 function isEditable(e: any): boolean {
   return e.status === 'draft' || e.status === 'rejected'
 }

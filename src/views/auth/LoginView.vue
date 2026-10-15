@@ -3,6 +3,9 @@
     <v-card elevation="2" rounded="lg">
       <v-card-text class="pa-6">
         <h2 class="text-h6 font-weight-bold mb-4">Masuk ke Akun</h2>
+        <v-alert v-if="route.query.reset === '1'" type="success" variant="tonal" density="compact" class="mb-4">
+          Password berhasil direset. Silakan login dengan password baru.
+        </v-alert>
         <v-form ref="formRef" @submit.prevent="handleLogin">
           <v-text-field
             v-model="form.email"
@@ -24,8 +27,11 @@
             variant="outlined"
             density="comfortable"
             :rules="[v => !!v || 'Password wajib diisi']"
-            class="mb-4"
+            class="mb-1"
           />
+          <div class="text-right mb-4">
+            <router-link to="/forgot-password" class="text-body-2">Lupa password?</router-link>
+          </div>
           <v-alert v-if="errorMsg" type="error" variant="tonal" density="compact" class="mb-4">
             {{ errorMsg }}
           </v-alert>
