@@ -63,8 +63,12 @@ import { getErrorMessage } from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
-const token = typeof route.query.token === 'string' ? route.query.token : ''
-const email = ref(typeof route.query.email === 'string' ? route.query.email : '')
+// Link email: /reset-password#token=...&email=... (fragment tidak dikirim ke server/log)
+const linkParams = new URLSearchParams(route.hash.replace(/^#/, ''))
+const token = linkParams.get('token') ?? ''
+const email = ref(linkParams.get('email') ?? '')
+// Token tidak perlu terlihat di address bar/riwayat browser setelah dibaca
+if (token) router.replace({ path: route.path, hash: '' })
 const formRef = ref()
 const password = ref('')
 const confirmation = ref('')

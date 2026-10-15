@@ -18,7 +18,7 @@ test.describe('lupa password', () => {
   })
 
   test('link reset yang tidak valid ditolak', async ({ page }) => {
-    await page.goto('/reset-password?token=palsu&email=budi%40example.test')
+    await page.goto('/reset-password#token=palsu&email=budi%40example.test')
     await expect(page.getByLabel('Email')).toHaveValue('budi@example.test')
     await page.getByLabel('Password baru', { exact: true }).fill('baru-sekali-123')
     await page.getByLabel('Ulangi password baru').fill('baru-sekali-123')
@@ -33,7 +33,7 @@ test.describe('lupa password', () => {
         : route.fulfill({ status: 200, headers: CORS, contentType: 'application/json',
           body: JSON.stringify({ message: 'Password berhasil direset. Silakan login dengan password baru.' }) }))
 
-    await page.goto('/reset-password?token=abc&email=budi%40example.test')
+    await page.goto('/reset-password#token=abc&email=budi%40example.test')
     await page.getByLabel('Password baru', { exact: true }).fill('baru-sekali-123')
     await page.getByLabel('Ulangi password baru').fill('baru-sekali-123')
     await page.getByRole('button', { name: 'Simpan password baru' }).click()
