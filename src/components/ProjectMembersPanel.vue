@@ -15,7 +15,7 @@
         </v-list-item-subtitle>
         <template #append>
           <div v-if="canManage" class="d-flex align-center ga-1">
-            <v-select :model-value="busyUserId === m.user?.id && pendingRole ? pendingRole : m.role" :items="roleOptionsFor(m.user)" label="Role" variant="outlined" density="compact"
+            <v-select :model-value="busyUserId === m.user?.id && pendingRole ? pendingRole : m.role" :items="roleOptionsFor(m.user)" label="Role" :aria-label="`Role ${m.user?.name}`" variant="outlined" density="compact"
               hide-details style="width: 140px" :loading="busyUserId === m.user?.id" :disabled="busyUserId === m.user?.id"
               @update:model-value="(role: string) => changeRole(m, role)" />
             <v-btn icon="mdi-account-remove" variant="text" size="small" color="error" :aria-label="`Keluarkan ${m.user?.name}`"
@@ -26,12 +26,12 @@
       </v-list-item>
     </v-list>
 
-    <v-dialog v-model="addDialog" max-width="480">
+    <v-dialog v-model="addDialog" max-width="480" aria-labelledby="add-member-title">
       <v-card rounded="lg">
-        <v-card-title class="pa-5 pb-2">Tambah anggota</v-card-title>
+        <v-card-title id="add-member-title" class="pa-5 pb-2">Tambah anggota</v-card-title>
         <v-card-text>
           <v-autocomplete v-model="candidate" v-model:search="search" :items="candidates" :loading="searching"
-            :item-title="(u: UserLookup) => `${u.name} (${u.email})`" return-object no-filter
+            :item-title="lookupTitle" return-object no-filter
             label="Cari user" placeholder="Ketik minimal 2 huruf nama atau email" variant="outlined" density="comfortable"
             :no-data-text="search && search.length >= 2 ? 'User tidak ditemukan' : 'Ketik minimal 2 huruf'" class="mb-2" />
           <v-select v-model="newRole" :items="roleOptionsFor(candidate)" label="Role di project" variant="outlined"
@@ -46,9 +46,10 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog :model-value="!!removing" max-width="420" @update:model-value="(open: boolean) => { if (!open) removing = null }">
+    <v-dialog :model-value="!!removing" max-width="420" aria-labelledby="remove-member-title"
+      @update:model-value="(open: boolean) => { if (!open) removing = null }">
       <v-card rounded="lg">
-        <v-card-title class="pa-5 pb-2">Keluarkan anggota?</v-card-title>
+        <v-card-title id="remove-member-title" class="pa-5 pb-2">Keluarkan anggota?</v-card-title>
         <v-card-text>{{ removing?.user?.name }} tidak lagi bisa melihat atau mengubah data project ini.</v-card-text>
         <v-card-actions class="pa-5 pt-0">
           <v-spacer />
@@ -70,7 +71,8 @@ import { useUiStore } from '@/stores/ui.store'
 import { PROJECT_ROLE_LABELS } from '@/utils/constants'
 
 // reload: muat ulang anggota (dan role user sendiri) di parent; ditunggu sebelum baris aktif lagi,
-// supaya pilihan berikutnya selalu berdasarkan data terbaru
+// supaya pilihan berikutnya selalu berdasarkan data terbaru. Gagal muat ditampilkan parent sendiri
+// dan tidak dianggap gagalnya aksi (lihat refresh)
 const props = defineProps<{ projectId: number; members: any[]; canManage: boolean; reload: () => Promise<void> }>()
 const ui = useUiStore()
 
@@ -97,6 +99,9 @@ const removing = ref<any>(null)
 const busyUserId = ref<number | null>(null)
 const pendingRole = ref<string | null>(null)
 
+const lookupTitle = (u: UserLookup) => `${u.name} (${u.email})`
+const refresh = () => props.reload().catch(() => undefined)
+
 function openAdd() {
   candidate.value = null
   candidates.value = []
@@ -112,7 +117,14 @@ const latestSearch = useLatestRequest()
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(search, (term) => {
   clearTimeout(searchTimer)
-  if (!term || term.length < 2 || term === (candidate.value && `${candidate.value.name} (${candidate.value.email})`)) return
+  if (candidate.value && term === lookupTitle(candidate.value)) return
+  if (!term || term.length < 2) {
+    // Kata kunci dihapus: hasil pencarian yang masih berjalan tidak dipakai lagi
+    latestSearch.next()
+    searching.value = false
+    candidates.value = []
+    return
+  }
   searchTimer = setTimeout(async () => {
     const ticket = latestSearch.next()
     searching.value = true
@@ -136,7 +148,7 @@ async function add() {
     await projectsService.addMember(props.projectId, { user_id: candidate.value.id, role: newRole.value })
     ui.showSnackbar(`${candidate.value.name} ditambahkan sebagai ${PROJECT_ROLE_LABELS[newRole.value]}.`)
     addDialog.value = false
-    await props.reload()
+    await refresh()
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal menambah anggota.'))
   } finally {
@@ -151,7 +163,7 @@ async function changeRole(m: any, role: string) {
   try {
     await projectsService.updateMember(props.projectId, m.user.id, role)
     ui.showSnackbar(`Role ${m.user.name} diubah menjadi ${PROJECT_ROLE_LABELS[role]}.`)
-    await props.reload()
+    await refresh()
   } catch (e: any) {
     // Pilihan di select kembali ke role semula karena nilainya tetap dari data member
     ui.showError(getErrorMessage(e, 'Gagal mengubah role.'))
@@ -169,7 +181,7 @@ async function remove() {
     await projectsService.removeMember(props.projectId, m.user.id)
     ui.showSnackbar(`${m.user.name} dikeluarkan dari project.`)
     removing.value = null
-    await props.reload()
+    await refresh()
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal mengeluarkan anggota.'))
   } finally {

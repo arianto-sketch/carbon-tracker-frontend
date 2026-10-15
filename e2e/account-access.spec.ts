@@ -20,6 +20,8 @@ test.describe('lupa password', () => {
   test('link reset yang tidak valid ditolak', async ({ page }) => {
     await page.goto('/reset-password#token=palsu&email=budi%40example.test')
     await expect(page.getByLabel('Email')).toHaveValue('budi@example.test')
+    // Token tidak dibiarkan di address bar / riwayat browser
+    await expect(page).not.toHaveURL(/token=/)
     await page.getByLabel('Password baru', { exact: true }).fill('baru-sekali-123')
     await page.getByLabel('Ulangi password baru').fill('baru-sekali-123')
     await page.getByRole('button', { name: 'Simpan password baru' }).click()
@@ -46,6 +48,16 @@ test.describe('lupa password', () => {
     await page.goto('/reset-password')
     await expect(page.getByText('Link reset tidak lengkap')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Minta link baru' })).toHaveAttribute('href', '/forgot-password')
+  })
+})
+
+test.describe('link reset saat masih login', () => {
+  test.use({ storageState: USERS.pm.state })
+
+  test('user yang masih login tetap bisa membuka link reset', async ({ page }) => {
+    await page.goto('/reset-password#token=abc&email=budi%40example.test')
+    await expect(page).toHaveURL(/\/reset-password/)
+    await expect(page.getByRole('button', { name: 'Simpan password baru' })).toBeVisible()
   })
 })
 

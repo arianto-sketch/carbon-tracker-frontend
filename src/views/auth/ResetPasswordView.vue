@@ -59,15 +59,18 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import { authService } from '@/services/auth.service'
+import { useAuthStore } from '@/stores/auth.store'
 import { getErrorMessage } from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 // Link email: /reset-password#token=...&email=... (fragment tidak dikirim ke server/log)
 const linkParams = new URLSearchParams(route.hash.replace(/^#/, ''))
 const token = linkParams.get('token') ?? ''
 const email = ref(linkParams.get('email') ?? '')
-// Token tidak perlu terlihat di address bar/riwayat browser setelah dibaca
+// Token tidak perlu terlihat di address bar/riwayat browser setelah dibaca (route.hash sudah dibaca di atas,
+// jadi replace tidak perlu ditunggu)
 if (token) router.replace({ path: route.path, hash: '' })
 const formRef = ref()
 const password = ref('')
@@ -85,6 +88,8 @@ async function submit() {
     await authService.resetPassword({
       token, email: email.value, password: password.value, password_confirmation: confirmation.value,
     })
+    // Semua sesi user itu sudah dicabut backend; sesi lokal yang masih tersimpan dibersihkan juga
+    if (authStore.isAuthenticated) await authStore.logout()
     // Hanya penanda tetap di URL (bukan teks pesan), supaya halaman login tidak bisa dipakai menampilkan teks sembarang
     router.replace({ path: '/login', query: { reset: '1' } })
   } catch (e: any) {
