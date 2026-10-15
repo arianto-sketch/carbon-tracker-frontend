@@ -112,6 +112,7 @@ test.describe('kelola anggota project (owner)', () => {
     await pickSelect(memberRow, 'Role', 'Owner')
     await expect(page.getByText(`Role ${names.member} diubah menjadi Owner.`)).toBeVisible()
     await pickSelect(memberRow, 'Role', 'Member')
+    await expect(page.getByText(`Role ${names.member} diubah menjadi Member.`)).toBeVisible()
 
     await memberRow.getByRole('button', { name: `Keluarkan ${names.member}` }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Keluarkan' }).click()
