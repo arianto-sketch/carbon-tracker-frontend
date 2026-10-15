@@ -13,7 +13,7 @@
 
     <v-table density="compact">
       <thead><tr>
-        <th>Nama</th><th>Kategori</th><th>Scope</th><th>Satuan Input</th><th>Faktor (kg CO₂e)</th><th>Sumber</th><th>Status</th><th>Aksi</th>
+        <th>Nama</th><th>Kategori</th><th>Scope</th><th>Satuan Input</th><th>Faktor saat ini (kg CO₂e)</th><th>Sumber</th><th>Status</th><th>Aksi</th>
       </tr></thead>
       <tbody>
         <tr v-if="loading"><td colspan="8" class="text-center pa-4"><v-progress-circular indeterminate size="24" /></td></tr>
@@ -27,8 +27,10 @@
           <td class="text-caption text-medium-emphasis">{{ f.source }}</td>
           <td><v-chip :color="f.is_active ? 'green' : 'grey'" size="x-small" variant="tonal">{{ f.is_active ? 'Aktif' : 'Nonaktif' }}</v-chip></td>
           <td>
-            <v-btn icon="mdi-pencil" size="x-small" variant="text" @click="openDialog(f)" />
-            <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="deactivate(f.id)" />
+            <v-btn icon="mdi-pencil" size="x-small" variant="text" :aria-label="`Edit ${f.name}`" @click="openDialog(f)" />
+            <v-btn icon="mdi-calendar-clock" size="x-small" variant="text" :aria-label="`Nilai per periode ${f.name}`"
+              @click="valuesFactor = f; valuesDialog = true" />
+            <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" :aria-label="`Nonaktifkan ${f.name}`" @click="deactivate(f.id)" />
           </td>
         </tr>
       </tbody>
@@ -60,11 +62,14 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <FactorValuesDialog v-model="valuesDialog" :factor="valuesFactor" @changed="load" />
   </v-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
+import FactorValuesDialog from '@/components/FactorValuesDialog.vue'
 import ListPagination from '@/components/ListPagination.vue'
 import { useLatestRequest } from '@/composables/useLatestRequest'
 import { usePageQuery } from '@/composables/usePageQuery'
@@ -78,6 +83,9 @@ const factors = ref<any[]>([])
 const categories = ref<any[]>([])
 const loading = ref(false)
 const dialog = ref(false)
+// Dialog nilai per periode (nilai faktor berbeda tiap tahun, mis. faktor listrik PLN)
+const valuesDialog = ref(false)
+const valuesFactor = ref<any>(null)
 const saving = ref(false)
 const editId = ref<number | null>(null)
 const search = ref('')
