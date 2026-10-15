@@ -86,6 +86,9 @@
 
           <v-alert v-if="estimatedCo2 > 0" type="success" variant="tonal" density="compact">
             Estimasi emisi: <strong>{{ formatCo2(estimatedCo2) }}</strong>
+            <div v-if="periodsLoaded && form.entry_date && factorValueOnDate !== null" class="text-caption">
+              Nilai faktor pada tanggal ini: {{ formatFactor(factorValueOnDate) }} kg CO₂e per {{ selectedUnit }}
+            </div>
           </v-alert>
         </v-form>
       </v-card-text>
@@ -124,17 +127,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { categoriesService } from '@/services/categories.service'
 import { entriesService } from '@/services/entries.service'
 import { projectsService } from '@/services/projects.service'
 import { useAccessErrorRedirect } from '@/composables/useAccessErrorRedirect'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { getErrorMessage } from '@/services/api'
 import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2 } from '@/utils/formatters'
 import { scopeLabel } from '@/utils/constants'
+import { formatFactor, valueOn, type FactorPeriod } from '@/utils/factorPeriods'
 
 const route = useRoute()
 const router = useRouter()
@@ -197,8 +202,24 @@ const form = ref({ category_id: null as number | null, emission_factor_id: null 
 const selectedCategory = computed(() => categories.value.find(c => c.id === form.value.category_id))
 const selectedFactor = computed(() => factors.value.find(f => f.id === form.value.emission_factor_id))
 const selectedUnit = computed(() => selectedFactor.value?.source_unit ?? '-')
+// Nilai faktor bisa berbeda per periode: estimasi memakai nilai yang berlaku pada tanggal aktivitas
+const factorPeriods = ref<FactorPeriod[]>([])
+const latestPeriods = useLatestRequest()
+watch(() => form.value.emission_factor_id, async (id) => {
+  const ticket = latestPeriods.next()
+  factorPeriods.value = []
+  if (!id) return
+  try {
+    const res = await categoriesService.factorValues(id)
+    if (latestPeriods.isCurrent(ticket)) factorPeriods.value = res.data
+  } catch { /* estimasi kembali memakai nilai saat ini (keterangan nilai per tanggal tidak ditampilkan) */ }
+}, { immediate: true })
+// Keterangan "nilai pada tanggal ini" hanya bila periode sudah dimuat (bukan nilai saat ini sebagai cadangan)
+const periodsLoaded = computed(() => factorPeriods.value.length > 0)
+const factorValueOnDate = computed(() =>
+  valueOn(factorPeriods.value, form.value.entry_date) ?? selectedFactor.value?.factor_value ?? null)
 const estimatedCo2 = computed(() =>
-  form.value.quantity && selectedFactor.value ? form.value.quantity * selectedFactor.value.factor_value : 0
+  form.value.quantity && factorValueOnDate.value !== null ? form.value.quantity * factorValueOnDate.value : 0
 )
 
 // Semua faktor aktif kategori ini dalam satu halaman (sebelumnya terpotong di 20)
