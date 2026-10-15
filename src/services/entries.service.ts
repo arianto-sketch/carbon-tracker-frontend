@@ -64,6 +64,15 @@ export const entriesService = {
     const { data } = await api.get(`/projects/${projectId}/entries/${id}/history`)
     return data.data
   },
+  /** Approve/tolak banyak entri; entri yang tidak memenuhi syarat dikembalikan di skipped beserta alasannya */
+  async bulkReview(projectId: number, payload: { action: 'approve' | 'reject'; entry_ids: number[]; reason?: string }): Promise<{
+    message: string
+    processed: number[]
+    skipped: { id: number; reason: string }[]
+  }> {
+    const { data } = await api.post(`/projects/${projectId}/entries/bulk-review`, payload)
+    return { message: data.message, ...data.data }
+  },
   async reject(projectId: number, id: number, reason: string) {
     const { data } = await api.post(`/projects/${projectId}/entries/${id}/reject`, { reason })
     return data.data
