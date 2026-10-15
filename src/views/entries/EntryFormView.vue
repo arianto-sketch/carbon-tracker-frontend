@@ -142,7 +142,7 @@ import { getErrorMessage } from '@/services/api'
 import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
-import { suggestCopyDate } from '@/utils/dates'
+import { localToday, suggestCopyDate } from '@/utils/dates'
 import { scopeLabel } from '@/utils/constants'
 import { formatFactor, valueOn, type FactorPeriod } from '@/utils/factorPeriods'
 
@@ -301,11 +301,6 @@ async function loadCopy() {
   }
 }
 
-/** Tanggal hari ini menurut zona waktu browser user, YYYY-MM-DD */
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 async function loadEntry() {
   const loaded = await entriesService.get(projectId, entryId!)

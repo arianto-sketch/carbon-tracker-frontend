@@ -39,12 +39,12 @@
           </div>
           <!-- Review massal: hanya entri submitted yang boleh di-review user ini (owner/admin, bukan buatan sendiri) -->
           <div v-if="selected.length" class="d-flex flex-wrap align-center ga-2 mb-2">
-            <span class="text-body-2 font-weight-medium">{{ selected.length }} entri dipilih</span>
+            <span class="text-body-2 font-weight-medium" role="status">{{ selected.length }} entri dipilih</span>
             <v-btn size="small" color="green" variant="tonal" prepend-icon="mdi-check-all" :loading="bulkBusy"
               @click="bulkReview('approve')">Setujui terpilih</v-btn>
             <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-close-box-multiple" :disabled="bulkBusy"
               @click="openBulkReject">Tolak terpilih</v-btn>
-            <v-btn size="small" variant="text" @click="selected = []">Batal pilih</v-btn>
+            <v-btn size="small" variant="text" @click="selected = []">Kosongkan pilihan</v-btn>
           </div>
           <v-alert v-if="skippedReport.length" type="warning" variant="tonal" density="compact" closable class="mb-2"
             @click:close="skippedReport = []">
@@ -280,9 +280,15 @@ async function confirmReject() {
   if (!valid) return
   if (rejectIds.value.length) {
     rejecting.value = true
-    await bulkReview('reject', rejectReason.value.trim(), rejectIds.value)
-    rejecting.value = false
-    rejectDialog.value = false
+    try {
+      // Dialog (dan alasan yang sudah diketik) tetap terbuka bila gagal
+      if (await bulkReview('reject', rejectReason.value.trim(), rejectIds.value)) {
+        rejectDialog.value = false
+        rejectIds.value = []
+      }
+    } finally {
+      rejecting.value = false
+    }
     return
   }
   if (rejectEntryId === null) return
@@ -312,7 +318,8 @@ const allSelected = computed({
   set: (all: boolean) => { selected.value = all ? [...reviewableIds.value] : [] },
 })
 const someSelected = computed(() => selected.value.length > 0 && !allSelected.value)
-// Halaman/filter berganti atau entri sudah di-review: pilihan yang tidak lagi tampil dibuang
+// Halaman/filter berganti atau entri sudah di-review: pilihan yang tidak lagi tampil dibuang.
+// (Daftar di dialog tolak massal yang sedang terbuka tidak ikut dipangkas; backend melewatinya.)
 watch(reviewableIds, (ids) => { selected.value = selected.value.filter(eid => ids.includes(eid)) })
 
 function openBulkReject() {
@@ -322,7 +329,9 @@ function openBulkReject() {
   rejectDialog.value = true
 }
 
-async function bulkReview(action: 'approve' | 'reject', reason?: string, ids: number[] = selected.value) {
+/** @returns true bila permintaan diproses (sebagian entri boleh dilewati) */
+async function bulkReview(action: 'approve' | 'reject', reason?: string, ids: number[] = selected.value): Promise<boolean> {
+  if (bulkBusy.value) return false
   // Label disimpan sebelum daftar dimuat ulang, untuk menjelaskan entri yang dilewati
   const labels = new Map(entries.value.map(e => [e.id, `${formatDate(e.entry_date)} · ${e.emission_factor?.name ?? '-'} · ${e.quantity} ${e.source_unit}`]))
   bulkBusy.value = true
@@ -332,8 +341,10 @@ async function bulkReview(action: 'approve' | 'reject', reason?: string, ids: nu
     skippedReport.value = res.skipped.map(s => ({ id: s.id, label: labels.get(s.id) ?? `Entri #${s.id}`, reason: s.reason }))
     selected.value = []
     await loadEntries()
+    return true
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal memproses entri terpilih.'))
+    return false
   } finally {
     bulkBusy.value = false
   }

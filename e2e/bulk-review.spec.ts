@@ -1,5 +1,14 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { USERS, apiAs, apiLogin, field, tokenFromState, uniqueCode } from './helpers'
+import { isoDate, localToday, suggestCopyDate } from '../src/utils/dates'
+import { formatDate } from '../src/utils/formatters'
+
+// Tanggal entri uji selalu di masa lalu, berapa pun tanggal hari ini: tanggal 10, dua bulan lalu
+// (jadi saran salinan, sebulan setelahnya, juga belum melewati hari ini)
+const base = new Date()
+base.setDate(10)
+base.setMonth(base.getMonth() - 2)
+const entryDate = isoDate(base)
 
 // Owner me-review banyak entri sekaligus; entri bisa disalin (mis. tagihan rutin bulanan).
 test.describe.configure({ mode: 'serial' })
@@ -14,7 +23,7 @@ let memberApi: APIRequestContext
 
 async function submitted(quantity: number): Promise<number> {
   const entry = await memberApi.post(`projects/${projectId}/entries`, {
-    data: { emission_factor_id: factorId, quantity, entry_date: `${new Date().getFullYear()}-02-10` },
+    data: { emission_factor_id: factorId, quantity, entry_date: entryDate },
   })
   expect(entry.ok(), await entry.text()).toBeTruthy()
   const id = (await entry.json()).data.id
@@ -46,7 +55,8 @@ test.afterAll(async () => {
 })
 
 const row = (page: import('@playwright/test').Page, quantity: number) =>
-  page.getByRole('row').filter({ hasText: `${quantity} liter` })
+  // \b: "41 liter" tidak ikut cocok dengan "141 liter" (teks sel dalam satu baris tergabung tanpa spasi)
+  page.getByRole('row').filter({ hasText: new RegExp(`\\b${quantity} liter`) })
 
 test('owner menyetujui semua entri yang dipilih sekaligus', async ({ page }) => {
   await page.goto(`/projects/${projectId}`)
@@ -73,6 +83,7 @@ test('owner menolak entri terpilih dengan satu alasan', async ({ page }) => {
   await expect(row(page, 51)).toContainText('Alasan: Lampirkan struk untuk setiap entri.')
 })
 
+// 'Pilih semua' di sini mengandalkan test sebelumnya: entri 41-43 sudah disetujui, 51-52 ditolak
 test('entri yang sudah berubah status dilewati dan alasannya ditampilkan', async ({ page }) => {
   const stale = await submitted(61)
   await submitted(62)
@@ -96,9 +107,9 @@ test('menyalin entri: form terisi, tanggal disarankan bulan berikutnya', async (
   await row(page, 41).getByRole('link', { name: 'Salin entri' }).click()
 
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/entries/new\\?copyFrom=\\d+`))
-  await expect(page.getByText('Disalin dari entri 10 Feb')).toBeVisible()
+  await expect(page.getByText(`Disalin dari entri ${formatDate(entryDate)}`)).toBeVisible()
   await expect(field(page, 'Jumlah')).toHaveValue('41')
-  await expect(field(page, 'Tanggal Aktivitas')).toHaveValue(`${new Date().getFullYear()}-03-10`)
+  await expect(field(page, 'Tanggal Aktivitas')).toHaveValue(suggestCopyDate(entryDate, localToday()))
 
   await field(page, 'Jumlah').fill('45')
   await page.getByRole('button', { name: 'Simpan' }).click()
