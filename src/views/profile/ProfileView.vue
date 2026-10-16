@@ -24,10 +24,16 @@
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-5 pb-2 text-body-1 font-weight-bold">Notifikasi</v-card-title>
       <v-card-text class="pa-5 pt-0">
-        <v-switch v-model="emailNotifications" label="Kirim notifikasi email" color="primary" density="comfortable"
-          :loading="savingEmail" :disabled="savingEmail" persistent-hint
+        <v-switch v-model="preferences.email_notifications" label="Kirim notifikasi email" color="primary" density="comfortable"
+          :loading="saving === 'email_notifications'" :disabled="saving !== null" persistent-hint
           hint="Email saat entri menunggu approval Anda, disetujui, atau ditolak. Notifikasi di aplikasi tetap muncul."
-          @update:model-value="saveEmailPreference" />
+          @update:model-value="(v: boolean | null) => savePreference('email_notifications', v)" />
+        <!-- Role global Viewer tidak pernah menerima ringkasan (hanya owner project dan admin) -->
+        <v-switch v-if="authStore.user?.role !== 'viewer'" v-model="preferences.monthly_summary_email"
+          label="Kirim email ringkasan bulanan" color="primary" density="comfortable" class="mt-2"
+          :loading="saving === 'monthly_summary_email'" :disabled="saving !== null" persistent-hint
+          hint="Setiap tanggal 1 untuk owner project dan admin: emisi bulan lalu per project, entri menunggu review, dan target yang hampir terlampaui."
+          @update:model-value="(v: boolean | null) => savePreference('monthly_summary_email', v)" />
       </v-card-text>
     </v-card>
 
@@ -78,20 +84,29 @@ async function saveProfile() {
 }
 
 // Disimpan langsung saat diubah; nama yang dikirim adalah nama tersimpan, bukan isian form di atas
-const emailNotifications = ref<boolean>(authStore.user?.email_notifications ?? true)
-const savingEmail = ref(false)
+type Preference = 'email_notifications' | 'monthly_summary_email'
+const PREFERENCE_MESSAGES: Record<Preference, { on: string; off: string }> = {
+  email_notifications: { on: 'Notifikasi email dinyalakan.', off: 'Notifikasi email dimatikan.' },
+  monthly_summary_email: { on: 'Email ringkasan bulanan dinyalakan.', off: 'Email ringkasan bulanan dimatikan.' },
+}
+const preferences = ref<Record<Preference, boolean>>({
+  email_notifications: authStore.user?.email_notifications ?? true,
+  monthly_summary_email: authStore.user?.monthly_summary_email ?? true,
+})
+// Satu per satu: keduanya dikirim lewat PUT /auth/me yang sama
+const saving = ref<Preference | null>(null)
 
-async function saveEmailPreference(value: boolean | null) {
+async function savePreference(key: Preference, value: boolean | null) {
   const enabled = !!value
-  savingEmail.value = true
+  saving.value = key
   try {
-    authStore.user = await authService.updateProfile({ name: authStore.user.name, email_notifications: enabled })
-    ui.showSnackbar(enabled ? 'Notifikasi email dinyalakan.' : 'Notifikasi email dimatikan.')
+    authStore.user = await authService.updateProfile({ name: authStore.user.name, [key]: enabled })
+    ui.showSnackbar(enabled ? PREFERENCE_MESSAGES[key].on : PREFERENCE_MESSAGES[key].off)
   } catch (e: any) {
-    emailNotifications.value = !enabled
+    preferences.value[key] = !enabled
     ui.showError(getErrorMessage(e, 'Gagal menyimpan preferensi notifikasi.'))
   } finally {
-    savingEmail.value = false
+    saving.value = null
   }
 }
 
