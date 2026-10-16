@@ -9,7 +9,10 @@ test.describe('preferensi email ringkasan bulanan', () => {
   test.afterAll(async () => {
     const pmApi = await apiAs(tokenFromState(USERS.pm.state))
     const me = (await (await pmApi.get('auth/me')).json()).data
-    if (!me.monthly_summary_email) await pmApi.put('auth/me', { data: { name: me.name, monthly_summary_email: true } })
+    if (!me.monthly_summary_email) {
+      const restored = await pmApi.put('auth/me', { data: { name: me.name, monthly_summary_email: true } })
+      expect(restored.ok(), await restored.text()).toBeTruthy()
+    }
     await pmApi.dispose()
   })
 
