@@ -37,19 +37,41 @@
               <v-btn color="primary" prepend-icon="mdi-plus" :to="`/projects/${id}/entries/new`">Tambah Entri</v-btn>
             </div>
           </div>
+          <!-- Review massal: hanya entri submitted yang boleh di-review user ini (owner/admin, bukan buatan sendiri) -->
+          <div v-if="selected.length" class="d-flex flex-wrap align-center ga-2 mb-2">
+            <span class="text-body-2 font-weight-medium" role="status">{{ selected.length }} entri dipilih</span>
+            <v-btn size="small" color="green" variant="tonal" prepend-icon="mdi-check-all" :loading="bulkBusy"
+              @click="bulkReview('approve')">Setujui terpilih</v-btn>
+            <v-btn size="small" color="error" variant="tonal" prepend-icon="mdi-close-box-multiple" :disabled="bulkBusy"
+              @click="openBulkReject">Tolak terpilih</v-btn>
+            <v-btn size="small" variant="text" @click="selected = []">Kosongkan pilihan</v-btn>
+          </div>
+          <v-alert v-if="skippedReport.length" type="warning" variant="tonal" density="compact" closable class="mb-2"
+            @click:close="skippedReport = []">
+            <div class="font-weight-medium">{{ skippedReport.length }} entri dilewati:</div>
+            <div v-for="s in skippedReport" :key="s.id" class="text-body-2">{{ s.label }}: {{ s.reason }}</div>
+          </v-alert>
           <v-table density="compact">
             <thead><tr>
+              <th v-if="canReviewAny" style="width: 40px">
+                <v-checkbox-btn v-model="allSelected" :indeterminate="someSelected" density="compact"
+                  aria-label="Pilih semua entri yang bisa di-review" />
+              </th>
               <th>Tanggal</th><th>Kategori</th><th>Faktor Emisi</th>
               <th>Jumlah</th><th>Emisi</th><th>Status</th><th>Aksi</th>
             </tr></thead>
             <tbody>
               <tr v-if="!entries.length">
-                <td colspan="7">
+                <td :colspan="canReviewAny ? 8 : 7">
                   <EmptyState compact icon="mdi-clipboard-text-outline" title="Belum ada entri"
                     :text="canWrite ? 'Tambahkan entri atau import dari Excel/CSV.' : undefined" />
                 </td>
               </tr>
               <tr v-for="e in entries" :key="e.id">
+                <td v-if="canReviewAny">
+                  <v-checkbox-btn v-if="isReviewable(e)" v-model="selected" :value="e.id" density="compact"
+                    :aria-label="`Pilih entri ${formatDate(e.entry_date)} ${e.quantity} ${e.source_unit}`" />
+                </td>
                 <td>{{ formatDate(e.entry_date) }}</td>
                 <td>{{ e.category?.name }}</td>
                 <td>{{ e.emission_factor?.name }}</td>
@@ -66,6 +88,8 @@
                   <v-btn v-if="isEditable(e) && canWrite" icon="mdi-send" size="x-small" variant="text" @click="submitEntry(e.id)" />
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-check" size="x-small" variant="text" color="green" aria-label="Approve entri" @click="approveEntry(e.id)" />
                   <v-btn v-if="e.status === 'submitted' && canApprove(e)" icon="mdi-close-circle" size="x-small" variant="text" color="error" aria-label="Tolak entri" @click="openReject(e)" />
+                  <v-btn v-if="canWrite" icon="mdi-content-copy" size="x-small" variant="text" aria-label="Salin entri"
+                    :to="`/projects/${id}/entries/new?copyFrom=${e.id}`" />
                   <v-btn icon="mdi-history" size="x-small" variant="text" aria-label="Riwayat entri" @click="openHistory(e.id)" />
                   <v-btn v-if="e.has_attachment" icon="mdi-paperclip" size="x-small" variant="text"
                     :aria-label="`Unduh lampiran ${e.attachment_name}`" @click="downloadAttachment(e)" />
@@ -139,9 +163,9 @@
     <EntryHistoryDialog v-model="historyDialog" :project-id="id" :entry-id="historyEntryId" />
     <ImportEntriesDialog v-model="importDialog" :project-id="id" @imported="loadEntries" />
 
-    <v-dialog v-model="rejectDialog" max-width="480">
+    <v-dialog v-model="rejectDialog" max-width="480" aria-labelledby="reject-title">
       <v-card rounded="lg">
-        <v-card-title class="pa-5 pb-2">Tolak Entri</v-card-title>
+        <v-card-title id="reject-title" class="pa-5 pb-2">{{ rejectIds.length ? `Tolak ${rejectIds.length} entri` : 'Tolak Entri' }}</v-card-title>
         <v-card-text>
           <p class="text-body-2 mb-3">Entri dikembalikan ke pembuatnya untuk diperbaiki. Jelaskan apa yang perlu diubah.</p>
           <v-form ref="rejectFormRef">
@@ -245,6 +269,7 @@ const rejecting = ref(false)
 let rejectEntryId: number | null = null
 
 function openReject(e: any) {
+  rejectIds.value = []
   rejectEntryId = e.id
   rejectReason.value = ''
   rejectDialog.value = true
@@ -252,7 +277,21 @@ function openReject(e: any) {
 
 async function confirmReject() {
   const { valid } = await rejectFormRef.value.validate()
-  if (!valid || rejectEntryId === null) return
+  if (!valid) return
+  if (rejectIds.value.length) {
+    rejecting.value = true
+    try {
+      // Dialog (dan alasan yang sudah diketik) tetap terbuka bila gagal
+      if (await bulkReview('reject', rejectReason.value.trim(), rejectIds.value)) {
+        rejectDialog.value = false
+        rejectIds.value = []
+      }
+    } finally {
+      rejecting.value = false
+    }
+    return
+  }
+  if (rejectEntryId === null) return
   rejecting.value = true
   try {
     await entriesService.reject(id, rejectEntryId, rejectReason.value.trim())
@@ -262,6 +301,53 @@ async function confirmReject() {
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal menolak entri.'))
   } finally { rejecting.value = false }
+}
+
+// --- Review massal ---
+const selected = ref<number[]>([])
+const rejectIds = ref<number[]>([])
+const bulkBusy = ref(false)
+const skippedReport = ref<{ id: number; label: string; reason: string }[]>([])
+function isReviewable(e: any): boolean {
+  return e.status === 'submitted' && canApprove(e)
+}
+const reviewableIds = computed(() => entries.value.filter(isReviewable).map(e => e.id))
+const canReviewAny = computed(() => reviewableIds.value.length > 0)
+const allSelected = computed({
+  get: () => canReviewAny.value && reviewableIds.value.every(eid => selected.value.includes(eid)),
+  set: (all: boolean) => { selected.value = all ? [...reviewableIds.value] : [] },
+})
+const someSelected = computed(() => selected.value.length > 0 && !allSelected.value)
+// Halaman/filter berganti atau entri sudah di-review: pilihan yang tidak lagi tampil dibuang.
+// (Daftar di dialog tolak massal yang sedang terbuka tidak ikut dipangkas; backend melewatinya.)
+watch(reviewableIds, (ids) => { selected.value = selected.value.filter(eid => ids.includes(eid)) })
+
+function openBulkReject() {
+  rejectIds.value = [...selected.value]
+  rejectEntryId = null
+  rejectReason.value = ''
+  rejectDialog.value = true
+}
+
+/** @returns true bila permintaan diproses (sebagian entri boleh dilewati) */
+async function bulkReview(action: 'approve' | 'reject', reason?: string, ids: number[] = selected.value): Promise<boolean> {
+  if (bulkBusy.value) return false
+  // Label disimpan sebelum daftar dimuat ulang, untuk menjelaskan entri yang dilewati
+  const labels = new Map(entries.value.map(e => [e.id, `${formatDate(e.entry_date)} · ${e.emission_factor?.name ?? '-'} · ${e.quantity} ${e.source_unit}`]))
+  bulkBusy.value = true
+  try {
+    const res = await entriesService.bulkReview(id, { action, entry_ids: [...ids], ...(reason ? { reason } : {}) })
+    ui.showSnackbar(res.message)
+    skippedReport.value = res.skipped.map(s => ({ id: s.id, label: labels.get(s.id) ?? `Entri #${s.id}`, reason: s.reason }))
+    selected.value = []
+    await loadEntries()
+    return true
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal memproses entri terpilih.'))
+    return false
+  } finally {
+    bulkBusy.value = false
+  }
 }
 
 function canApprove(e: any): boolean {

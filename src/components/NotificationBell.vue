@@ -48,6 +48,9 @@ const ICONS: Record<string, { icon: string; color: string }> = {
   entry_submitted: { icon: 'mdi-send', color: 'orange' },
   entry_approved: { icon: 'mdi-check-circle', color: 'green' },
   entry_rejected: { icon: 'mdi-close-circle', color: 'red' },
+  // Ringkasan approve/tolak massal
+  entries_approved: { icon: 'mdi-check-all', color: 'green' },
+  entries_rejected: { icon: 'mdi-close-box-multiple', color: 'red' },
 }
 const POLL_MS = 60_000
 

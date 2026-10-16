@@ -5,6 +5,10 @@
 
     <v-card rounded="lg" elevation="1">
       <v-card-text class="pa-5">
+        <v-alert v-if="copiedFrom" type="info" variant="tonal" density="compact" class="mb-4">
+          Disalin dari entri {{ formatDate(copiedFrom.entry_date) }}. Periksa tanggal dan jumlah sebelum menyimpan; lampiran tidak ikut disalin.
+          <div v-if="copyFactorInactive" class="mt-1">Faktor emisi entri asal sudah tidak aktif, pilih faktor lain.</div>
+        </v-alert>
         <v-form ref="formRef" @submit.prevent="save">
           <v-select
             v-model="form.category_id"
@@ -137,7 +141,8 @@ import { useLatestRequest } from '@/composables/useLatestRequest'
 import { getErrorMessage } from '@/services/api'
 import { saveFile } from '@/services/download'
 import { useUiStore } from '@/stores/ui.store'
-import { formatCo2 } from '@/utils/formatters'
+import { formatCo2, formatDate } from '@/utils/formatters'
+import { localToday, suggestCopyDate } from '@/utils/dates'
 import { scopeLabel } from '@/utils/constants'
 import { formatFactor, valueOn, type FactorPeriod } from '@/utils/factorPeriods'
 
@@ -148,6 +153,10 @@ const ui = useUiStore()
 const projectId = Number(route.params.id)
 const entryId = route.params.entryId ? Number(route.params.entryId) : null
 const isEdit = !!entryId
+// Salin entri (mis. tagihan rutin): form tambah terisi dari entri lain di project yang sama
+const copyFromId = !isEdit && Number(route.query.copyFrom) > 0 ? Number(route.query.copyFrom) : null
+const copiedFrom = ref<any>(null)
+const copyFactorInactive = ref(false)
 const formRef = ref()
 const saving = ref(false)
 const categories = ref<any[]>([])
@@ -266,10 +275,32 @@ onMounted(async () => {
     ])
     categories.value = cats
     if (isEdit) await loadEntry()
+    else if (copyFromId) await loadCopy()
   } catch (e: any) {
     if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat data entri.'))
   }
 })
+
+async function loadCopy() {
+  const source = await entriesService.get(projectId, copyFromId!)
+  copiedFrom.value = source
+  form.value = {
+    category_id: source.category?.id,
+    emission_factor_id: source.emission_factor?.id,
+    quantity: source.quantity,
+    entry_date: suggestCopyDate(source.entry_date, localToday()),
+    description: source.description ?? '',
+    vendor_name: source.vendor_name ?? '',
+    activity_type: source.activity_type ?? '',
+  }
+  await loadFactors()
+  // Daftar faktor hanya berisi faktor aktif
+  if (!factors.value.some(f => f.id === form.value.emission_factor_id)) {
+    form.value.emission_factor_id = null
+    copyFactorInactive.value = true
+  }
+}
+
 
 async function loadEntry() {
   const loaded = await entriesService.get(projectId, entryId!)
