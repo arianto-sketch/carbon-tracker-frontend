@@ -56,7 +56,7 @@
           <td v-if="canWrite" class="text-no-wrap">
             <v-btn icon="mdi-pencil" size="x-small" variant="text" :aria-label="`Ubah ${i.title}`" @click="openEdit(i)" />
             <v-btn v-if="canDelete" icon="mdi-delete" size="x-small" variant="text" color="error" :aria-label="`Hapus ${i.title}`"
-              @click="deleting = i" />
+              @click="openDelete(i)" />
           </td>
         </tr>
       </tbody>
@@ -105,14 +105,14 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog :model-value="!!deleting" max-width="420" aria-labelledby="initiative-delete-title"
-      @update:model-value="(open: boolean) => { if (!open) deleting = null }">
+    <!-- `deleting` tidak dikosongkan saat ditutup, supaya judul tetap tampil selama animasi tutup -->
+    <v-dialog v-model="deleteDialog" max-width="420" aria-labelledby="initiative-delete-title">
       <v-card rounded="lg">
         <v-card-title id="initiative-delete-title" class="pa-5 pb-2">Hapus inisiatif?</v-card-title>
         <v-card-text>"{{ deleting?.title }}" dihapus dari rencana aksi project ini.</v-card-text>
         <v-card-actions class="pa-5 pt-0">
           <v-spacer />
-          <v-btn variant="text" @click="deleting = null">Batal</v-btn>
+          <v-btn variant="text" @click="deleteDialog = false">Batal</v-btn>
           <v-btn color="error" :loading="removing" @click="remove">Hapus</v-btn>
         </v-card-actions>
       </v-card>
@@ -123,6 +123,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { getErrorMessage } from '@/services/api'
 import { categoriesService } from '@/services/categories.service'
 import { initiativesService, type Initiative, type InitiativePayload, type InitiativeStatus, type InitiativeTotals } from '@/services/initiatives.service'
@@ -143,17 +144,22 @@ const loading = ref(false)
 const loadError = ref(false)
 const columns = computed(() => (props.canWrite ? 7 : 6))
 
+// Simpan/hapus/"Coba lagi" bisa memicu muat ulang beruntun: hanya respons terakhir yang dipakai
+const latest = useLatestRequest()
+
 async function load() {
+  const ticket = latest.next()
   loading.value = true
   loadError.value = false
   try {
     const res = await initiativesService.list(props.projectId)
+    if (!latest.isCurrent(ticket)) return
     initiatives.value = res.data
     totals.value = res.meta
   } catch {
-    loadError.value = true
+    if (latest.isCurrent(ticket)) loadError.value = true
   } finally {
-    loading.value = false
+    if (latest.isCurrent(ticket)) loading.value = false
   }
 }
 
@@ -241,7 +247,13 @@ async function save() {
 }
 
 const deleting = ref<Initiative | null>(null)
+const deleteDialog = ref(false)
 const removing = ref(false)
+
+function openDelete(i: Initiative) {
+  deleting.value = i
+  deleteDialog.value = true
+}
 
 async function remove() {
   if (!deleting.value) return
@@ -249,7 +261,7 @@ async function remove() {
   try {
     await initiativesService.remove(props.projectId, deleting.value.id)
     ui.showSnackbar('Inisiatif berhasil dihapus.')
-    deleting.value = null
+    deleteDialog.value = false
     await load()
   } catch (e: any) {
     ui.showError(getErrorMessage(e, 'Gagal menghapus inisiatif.'))
@@ -260,6 +272,8 @@ async function remove() {
 
 onMounted(async () => {
   await load()
+  // Daftar kategori hanya dibutuhkan form tambah/ubah
+  if (!props.canWrite) return
   try {
     const categories = await categoriesService.listCategories()
     categoryOptions.value = categories.map((c: any) => ({ title: c.name, value: c.id }))

@@ -16,13 +16,15 @@ test.beforeAll(async () => {
   projectId = (await (await pmApi.post('projects', { data: { name: `Project ${code}`, code, start_date: '2024-01-01' } })).json()).data.id
 
   // Satu entri disetujui (oleh admin, bukan pembuatnya) supaya intensitas punya nilai
-  const factorId = (await (await pmApi.get('emission-factors', { params: { search: 'Bensin', is_active: 1 } })).json()).data[0].id
+  const factors = (await (await pmApi.get('emission-factors', { params: { search: 'Bensin', is_active: 1 } })).json()).data
+  expect(factors.length, 'faktor emisi "Bensin" aktif dari seeder').toBeGreaterThan(0)
   const entry = await pmApi.post(`projects/${projectId}/entries`, {
-    data: { emission_factor_id: factorId, quantity: 100, entry_date: '2025-01-15' },
+    data: { emission_factor_id: factors[0].id, quantity: 100, entry_date: '2025-01-15' },
   })
   expect(entry.ok(), await entry.text()).toBeTruthy()
   const entryId = (await entry.json()).data.id
-  await pmApi.post(`projects/${projectId}/entries/${entryId}/submit`)
+  const submitted = await pmApi.post(`projects/${projectId}/entries/${entryId}/submit`)
+  expect(submitted.ok(), await submitted.text()).toBeTruthy()
   const approved = await adminApi.post(`projects/${projectId}/entries/${entryId}/approve`)
   expect(approved.ok(), await approved.text()).toBeTruthy()
   await Promise.all([pmApi.dispose(), adminApi.dispose()])
@@ -89,8 +91,19 @@ test('owner menghapus inisiatif setelah konfirmasi', async ({ page }) => {
 })
 
 test('dashboard menampilkan ringkasan rencana aksi', async ({ page }) => {
+  // Database dipakai bersama antar-run: angka pembanding diambil dari API setelah data uji ditambahkan
+  const pmApi = await apiAs(tokenFromState(USERS.pm.state))
+  const created = await pmApi.post(`projects/${projectId}/initiatives`, {
+    data: { title: 'Panel surya', estimated_reduction_kg: 800, status: 'done' },
+  })
+  expect(created.ok(), await created.text()).toBeTruthy()
+  const summary = (await (await pmApi.get('dashboard/initiatives')).json()).data
+  await pmApi.dispose()
+  expect(summary.done_kg).toBeGreaterThanOrEqual(800)
+
   await page.goto('/')
   const card = page.getByRole('region', { name: 'Rencana aksi reduksi' })
-  await expect(card).toContainText('Potensi reduksi per tahun')
-  await expect(card).toContainText('inisiatif selesai')
+  await expect(card).toContainText(formatCo2(summary.planned_kg))
+  await expect(card).toContainText(formatCo2(summary.done_kg))
+  await expect(card).toContainText(`${summary.counts.done} inisiatif selesai`)
 })
