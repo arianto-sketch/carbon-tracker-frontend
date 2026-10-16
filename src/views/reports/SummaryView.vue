@@ -94,14 +94,16 @@
         <h2 class="text-subtitle-1 font-weight-bold mb-2">Per project</h2>
         <v-table density="compact">
           <caption class="d-sr-only">Emisi per project</caption>
-          <thead><tr><th>Project</th><th>Kode</th><th class="text-right">Emisi</th><th class="text-right">Entri</th></tr></thead>
+          <thead><tr><th>Project</th><th>Kode</th><th class="text-right">Emisi</th><th class="text-right">Entri</th><th class="text-right">Tim</th><th class="text-right">Intensitas</th></tr></thead>
           <tbody>
-            <tr v-if="!projects.length"><td colspan="4" class="text-medium-emphasis">{{ emptyText(SECTIONS.projects) }}</td></tr>
+            <tr v-if="!projects.length"><td colspan="6" class="text-medium-emphasis">{{ emptyText(SECTIONS.projects) }}</td></tr>
             <tr v-for="p in projects" :key="p.id">
               <td>{{ p.name }}</td>
               <td>{{ p.code }}</td>
               <td class="text-right text-no-wrap">{{ formatCo2(p.total_co2e_kg) }}</td>
               <td class="text-right">{{ p.entry_count }}</td>
+              <td class="text-right">{{ p.team_size ?? '-' }}</td>
+              <td class="text-right text-no-wrap">{{ formatIntensity(p.intensity_kg_per_person) }}</td>
             </tr>
           </tbody>
         </v-table>
@@ -142,6 +144,7 @@ import { dashboardService } from '@/services/dashboard.service'
 import { useUiStore } from '@/stores/ui.store'
 import { GHG_SCOPES } from '@/utils/constants'
 import { formatChange, formatCo2, formatDate, formatDateTime, formatNumber, monthLabel } from '@/utils/formatters'
+import { formatIntensity } from '@/utils/initiatives'
 import { comparisonCaption, projectionCaption, type Outlook } from '@/utils/outlook'
 
 const route = useRoute()

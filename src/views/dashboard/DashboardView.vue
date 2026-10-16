@@ -116,35 +116,59 @@
       </v-col>
     </v-row>
 
-    <!-- Peringatan Target -->
-    <v-card rounded="lg" elevation="1" class="mb-6">
-      <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
-        <v-icon class="mr-2" :color="store.targetAlerts.length ? 'warning' : 'success'" size="small">
-          {{ store.targetAlerts.length ? 'mdi-alert' : 'mdi-check-circle' }}
-        </v-icon>
-        Peringatan Target {{ new Date().getFullYear() }}
-      </v-card-title>
-      <v-card-text>
-        <p v-if="!store.targetAlerts.length" class="text-body-2 text-medium-emphasis mb-0">
-          Semua target aman — tidak ada target dengan pemakaian di atas 80%.
-        </p>
-        <v-list v-else density="compact" class="py-0">
-          <v-list-item v-for="a in store.targetAlerts" :key="a.target_id" :to="`/projects/${a.project_id}`" class="px-0">
-            <template #prepend>
-              <v-chip :color="a.level === 'exceeded' ? 'error' : 'warning'" size="small" variant="flat" class="mr-3">
-                {{ a.percentage_used.toFixed(1) }}%
-              </v-chip>
-            </template>
-            <v-list-item-title class="text-body-2 font-weight-medium">{{ a.project_name }}</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ a.category }} · {{ PERIOD_LABELS[a.period_type] ?? a.period_type }}{{ a.period_value ? ` ${a.period_value}` : '' }} ·
-              {{ formatCo2(a.actual_co2e_kg) }} dari {{ formatCo2(a.target_co2e_kg) }}
-              <strong v-if="a.level === 'exceeded'" class="text-error"> — melebihi target</strong>
-            </v-list-item-subtitle>
-          </v-list-item>
-        </v-list>
-      </v-card-text>
-    </v-card>
+    <v-row class="mb-4">
+      <v-col cols="12" md="8">
+        <!-- Peringatan Target -->
+        <v-card rounded="lg" elevation="1" class="h-100">
+          <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
+            <v-icon class="mr-2" :color="store.targetAlerts.length ? 'warning' : 'success'" size="small">
+              {{ store.targetAlerts.length ? 'mdi-alert' : 'mdi-check-circle' }}
+            </v-icon>
+            Peringatan Target {{ new Date().getFullYear() }}
+          </v-card-title>
+          <v-card-text>
+            <p v-if="!store.targetAlerts.length" class="text-body-2 text-medium-emphasis mb-0">
+              Semua target aman — tidak ada target dengan pemakaian di atas 80%.
+            </p>
+            <v-list v-else density="compact" class="py-0">
+              <v-list-item v-for="a in store.targetAlerts" :key="a.target_id" :to="`/projects/${a.project_id}`" class="px-0">
+                <template #prepend>
+                  <v-chip :color="a.level === 'exceeded' ? 'error' : 'warning'" size="small" variant="flat" class="mr-3">
+                    {{ a.percentage_used.toFixed(1) }}%
+                  </v-chip>
+                </template>
+                <v-list-item-title class="text-body-2 font-weight-medium">{{ a.project_name }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  {{ a.category }} · {{ PERIOD_LABELS[a.period_type] ?? a.period_type }}{{ a.period_value ? ` ${a.period_value}` : '' }} ·
+                  {{ formatCo2(a.actual_co2e_kg) }} dari {{ formatCo2(a.target_co2e_kg) }}
+                  <strong v-if="a.level === 'exceeded'" class="text-error"> — melebihi target</strong>
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <!-- Rencana aksi reduksi (estimasi per tahun, semua project yang bisa diakses) -->
+      <v-col cols="12" md="4">
+        <v-card rounded="lg" elevation="1" class="h-100" role="region" aria-labelledby="initiatives-title">
+          <v-card-title id="initiatives-title" class="text-body-1 font-weight-bold pa-4 pb-2">Rencana aksi reduksi</v-card-title>
+          <v-card-text v-if="store.initiatives">
+            <div class="mb-3">
+              <div class="text-h6 font-weight-bold text-primary">{{ formatCo2(store.initiatives.planned_kg) }}</div>
+              <div class="text-caption text-medium-emphasis">
+                Potensi reduksi per tahun · {{ store.initiatives.counts.planned + store.initiatives.counts.in_progress }} inisiatif direncanakan/berjalan
+              </div>
+            </div>
+            <div>
+              <div class="text-h6 font-weight-bold text-success">{{ formatCo2(store.initiatives.done_kg) }}</div>
+              <div class="text-caption text-medium-emphasis">Reduksi per tahun · {{ store.initiatives.counts.done }} inisiatif selesai</div>
+            </div>
+          </v-card-text>
+          <v-card-text v-else class="text-body-2 text-medium-emphasis">{{ store.loading ? 'Memuat…' : 'Data rencana aksi tidak tersedia.' }}</v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
 
     <v-row>
       <!-- Trend Chart -->

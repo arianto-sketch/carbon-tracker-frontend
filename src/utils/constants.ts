@@ -49,3 +49,24 @@ export const PROJECT_ROLE_LABELS: Record<string, string> = {
   member: 'Member',
   viewer: 'Viewer',
 }
+
+export const PROJECT_STATUS_LABELS: Record<string, string> = {
+  active: 'Aktif',
+  completed: 'Selesai',
+  archived: 'Diarsipkan',
+}
+
+// Status inisiatif rencana aksi reduksi
+export const INITIATIVE_STATUS_LABELS: Record<string, string> = {
+  planned: 'Direncanakan',
+  in_progress: 'Berjalan',
+  done: 'Selesai',
+  cancelled: 'Dibatalkan',
+}
+
+export const INITIATIVE_STATUS_COLORS: Record<string, string> = {
+  planned: 'blue',
+  in_progress: 'orange',
+  done: 'green',
+  cancelled: 'grey',
+}

@@ -10,7 +10,10 @@
             <v-chip :color="statusColor(project.status)" size="small" variant="tonal">{{ project.status }}</v-chip>
             <span class="text-caption text-medium-emphasis">{{ project.code }}</span>
           </div>
-          <h1 class="text-h5 font-weight-bold">{{ project.name }}</h1>
+          <div class="d-flex align-center ga-1">
+            <h1 class="text-h5 font-weight-bold">{{ project.name }}</h1>
+            <v-btn v-if="canManage" icon="mdi-pencil" size="small" variant="text" aria-label="Ubah project" @click="editDialog = true" />
+          </div>
           <p class="text-body-2 text-medium-emphasis">{{ project.client_name }}</p>
         </div>
         <div class="text-right">
@@ -22,6 +25,7 @@
       <v-tabs v-model="tab" color="primary" class="mb-4">
         <v-tab value="entries">Entri Emisi</v-tab>
         <v-tab value="targets">Target</v-tab>
+        <v-tab value="initiatives">Rencana Aksi</v-tab>
         <v-tab value="members">Anggota</v-tab>
         <v-tab value="summary">Ringkasan</v-tab>
       </v-tabs>
@@ -138,6 +142,11 @@
           </v-row>
         </v-window-item>
 
+        <!-- RENCANA AKSI TAB (dimuat saat tab pertama kali dibuka) -->
+        <v-window-item value="initiatives">
+          <ReductionInitiativesPanel :project-id="id" :members="members" :can-write="canWrite" :can-delete="canManage" />
+        </v-window-item>
+
         <!-- MEMBERS TAB -->
         <v-window-item value="members">
           <ProjectMembersPanel :project-id="id" :members="members" :can-manage="canManage" :reload="reloadMembers" />
@@ -145,6 +154,21 @@
 
         <!-- SUMMARY TAB -->
         <v-window-item value="summary">
+          <v-row>
+            <v-col cols="12" md="4">
+              <v-card rounded="lg" elevation="1" role="region" aria-labelledby="intensity-title">
+                <v-card-text>
+                  <div id="intensity-title" class="text-body-2 text-medium-emphasis mb-1">Intensitas emisi</div>
+                  <div class="text-h6 font-weight-bold text-primary">{{ formatIntensity(summary?.intensity_kg_per_person) }}</div>
+                  <div class="text-caption text-medium-emphasis">
+                    <template v-if="summary?.team_size">Total disetujui ÷ {{ summary.team_size }} anggota tim</template>
+                    <template v-else-if="canManage">Isi jumlah anggota tim lewat tombol ubah project untuk menghitung intensitas.</template>
+                    <template v-else>Jumlah anggota tim belum diisi owner project.</template>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
           <v-row>
             <v-col v-for="cat in summary?.by_category" :key="cat.category_id" cols="12" md="4">
               <v-card rounded="lg" elevation="1">
@@ -160,6 +184,7 @@
       </v-window>
     </template>
 
+    <ProjectFormDialog v-model="editDialog" :project="project" @saved="onProjectSaved" />
     <EntryHistoryDialog v-model="historyDialog" :project-id="id" :entry-id="historyEntryId" />
     <ImportEntriesDialog v-model="importDialog" :project-id="id" @imported="loadEntries" />
 
@@ -197,7 +222,10 @@ import { formatCo2, formatDate } from '@/utils/formatters'
 import { getErrorMessage } from '@/services/api'
 import EntryHistoryDialog from '@/components/EntryHistoryDialog.vue'
 import ImportEntriesDialog from '@/components/ImportEntriesDialog.vue'
+import ProjectFormDialog from '@/components/ProjectFormDialog.vue'
 import ProjectMembersPanel from '@/components/ProjectMembersPanel.vue'
+import ReductionInitiativesPanel from '@/components/ReductionInitiativesPanel.vue'
+import { formatIntensity } from '@/utils/initiatives'
 import ListPagination from '@/components/ListPagination.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { saveFile } from '@/services/download'
@@ -241,6 +269,17 @@ async function reloadMembers() {
     if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat anggota.'))
   }
 }
+const editDialog = ref(false)
+// Intensitas di ringkasan bergantung pada jumlah anggota tim, jadi ringkasan ikut dimuat ulang
+async function onProjectSaved(saved: any) {
+  project.value = saved
+  try {
+    summary.value = await projectsService.getSummary(id)
+  } catch (e: any) {
+    ui.showError(getErrorMessage(e, 'Gagal memuat ringkasan project.'))
+  }
+}
+
 function isEditable(e: any): boolean {
   return e.status === 'draft' || e.status === 'rejected'
 }

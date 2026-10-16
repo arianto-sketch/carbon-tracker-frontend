@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { dashboardService } from '@/services/dashboard.service'
+import type { InitiativeSummary } from '@/services/initiatives.service'
 import { useUiStore } from './ui.store'
 
 export const useDashboardStore = defineStore('dashboard', () => {
@@ -12,6 +13,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const topEntries = ref<any[]>([])
   const projects = ref<any[]>([])
   const targetAlerts = ref<any[]>([])
+  const initiatives = ref<InitiativeSummary | null>(null)
   const loading = ref(false)
 
   // Tiap bagian dimuat sendiri-sendiri: satu endpoint gagal tidak mengosongkan seluruh dashboard
@@ -26,6 +28,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       dashboardService.getTopEntries(params).then(v => { topEntries.value = v }),
       dashboardService.getProjects(params).then(v => { projects.value = v }),
       dashboardService.getTargetAlerts().then(v => { targetAlerts.value = v }),
+      dashboardService.getInitiatives().then(v => { initiatives.value = v }),
     ])
     loading.value = false
 
@@ -44,8 +47,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     topEntries.value = []
     projects.value = []
     targetAlerts.value = []
+    initiatives.value = null
     loading.value = false
   }
 
-  return { summary, trendData, categoryBreakdown, scopeBreakdown, outlook, topEntries, projects, targetAlerts, loading, fetchDashboard, reset }
+  return { summary, trendData, categoryBreakdown, scopeBreakdown, outlook, topEntries, projects, targetAlerts, initiatives, loading, fetchDashboard, reset }
 })
