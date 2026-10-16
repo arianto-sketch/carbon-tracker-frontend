@@ -44,6 +44,9 @@
               <div class="text-right mt-2 font-weight-bold text-primary">
                 {{ formatCo2(p.total_co2e_kg ?? 0) }}
               </div>
+              <div v-if="p.intensity_kg_per_person != null" class="text-right text-caption text-medium-emphasis">
+                {{ formatIntensity(p.intensity_kg_per_person) }}
+              </div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -51,41 +54,7 @@
     </v-row>
     <ListPagination v-model="page" :meta="meta" />
 
-    <!-- Create Dialog -->
-    <v-dialog v-model="dialog" max-width="540">
-      <v-card rounded="lg">
-        <v-card-title class="pa-5 pb-2">Project Baru</v-card-title>
-        <v-card-text>
-          <v-form ref="formRef" @submit.prevent="createProject">
-            <v-row dense>
-              <v-col cols="8">
-                <v-text-field v-model="form.name" label="Nama Project" variant="outlined" density="comfortable"
-                  :rules="[v => !!v || 'Wajib diisi']" />
-              </v-col>
-              <v-col cols="4">
-                <v-text-field v-model="form.code" label="Kode" variant="outlined" density="comfortable"
-                  :rules="[v => !!v || 'Wajib diisi']" />
-              </v-col>
-              <v-col cols="12">
-                <v-text-field v-model="form.client_name" label="Nama Client" variant="outlined" density="comfortable" />
-              </v-col>
-              <v-col cols="6">
-                <v-text-field v-model="form.start_date" label="Tanggal Mulai" type="date" variant="outlined" density="comfortable"
-                  :rules="[v => !!v || 'Wajib diisi']" />
-              </v-col>
-              <v-col cols="6">
-                <v-text-field v-model="form.end_date" label="Tanggal Selesai" type="date" variant="outlined" density="comfortable" />
-              </v-col>
-            </v-row>
-          </v-form>
-        </v-card-text>
-        <v-card-actions class="pa-5 pt-0">
-          <v-spacer />
-          <v-btn variant="text" @click="dialog = false">Batal</v-btn>
-          <v-btn color="primary" :loading="saving" @click="createProject">Simpan</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <ProjectFormDialog v-model="dialog" @saved="load" />
   </v-container>
 </template>
 
@@ -93,25 +62,21 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import ListPagination from '@/components/ListPagination.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import ProjectFormDialog from '@/components/ProjectFormDialog.vue'
 import { useLatestRequest } from '@/composables/useLatestRequest'
 import { usePageQuery } from '@/composables/usePageQuery'
 import { projectsService } from '@/services/projects.service'
-import { getErrorMessage } from '@/services/api'
 import { dashboardService } from '@/services/dashboard.service'
-import { useUiStore } from '@/stores/ui.store'
 import { formatCo2, formatDate } from '@/utils/formatters'
+import { formatIntensity } from '@/utils/initiatives'
 import { PROJECT_STATUS_COLORS } from '@/utils/constants'
 
-const ui = useUiStore()
 const projects = ref<any[]>([])
 const meta = ref<any>(null)
 const page = usePageQuery()
 const loading = ref(false)
-const saving = ref(false)
 const dialog = ref(false)
 const search = ref('')
-const formRef = ref()
-const form = ref({ name: '', code: '', client_name: '', start_date: '', end_date: '' })
 
 
 function statusColor(status: string) {
@@ -129,28 +94,15 @@ async function load() {
       dashboardService.getProjects(),
     ])
     if (!latest.isCurrent(ticket)) return
-    const emissionMap = Object.fromEntries(dRes.map((d: any) => [d.id, d.total_co2e_kg]))
-    projects.value = pRes.data.map((p: any) => ({ ...p, total_co2e_kg: emissionMap[p.id] ?? 0 }))
+    const emissionMap = Object.fromEntries(dRes.map((d: any) => [d.id, d]))
+    projects.value = pRes.data.map((p: any) => ({
+      ...p,
+      total_co2e_kg: emissionMap[p.id]?.total_co2e_kg ?? 0,
+      intensity_kg_per_person: emissionMap[p.id]?.intensity_kg_per_person ?? null,
+    }))
     meta.value = pRes.meta
   } finally {
     if (latest.isCurrent(ticket)) loading.value = false
-  }
-}
-
-async function createProject() {
-  const { valid } = await formRef.value.validate()
-  if (!valid) return
-  saving.value = true
-  try {
-    await projectsService.create(form.value)
-    ui.showSnackbar('Project berhasil dibuat.')
-    dialog.value = false
-    form.value = { name: '', code: '', client_name: '', start_date: '', end_date: '' }
-    await load()
-  } catch (e: any) {
-    ui.showError(getErrorMessage(e, 'Gagal membuat project.'))
-  } finally {
-    saving.value = false
   }
 }
 

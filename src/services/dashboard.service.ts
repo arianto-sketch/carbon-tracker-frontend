@@ -1,4 +1,5 @@
 import api from './api'
+import type { InitiativeSummary } from './initiatives.service'
 
 export const dashboardService = {
   async getSummary(params = {}) {
@@ -8,6 +9,11 @@ export const dashboardService = {
   // Target tahun berjalan dengan pemakaian >= 80% (tidak mengikuti filter tahun dashboard)
   async getTargetAlerts() {
     const { data } = await api.get('/dashboard/target-alerts')
+    return data.data
+  },
+  // Rencana aksi reduksi seluruh project yang bisa diakses (tidak mengikuti filter tahun)
+  async getInitiatives(params = {}): Promise<InitiativeSummary> {
+    const { data } = await api.get('/dashboard/initiatives', { params })
     return data.data
   },
   async getProjects(params = {}) {
