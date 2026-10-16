@@ -12,7 +12,7 @@ export const authService = {
     const { data } = await api.get('/auth/me')
     return data.data
   },
-  async updateProfile(payload: { name: string; avatar?: string; email_notifications?: boolean }) {
+  async updateProfile(payload: { name: string; avatar?: string; email_notifications?: boolean; monthly_summary_email?: boolean }) {
     const { data } = await api.put('/auth/me', payload)
     return data.data
   },
