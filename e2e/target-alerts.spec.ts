@@ -36,12 +36,14 @@ test.describe('peringatan target di dashboard', () => {
 
   test('menampilkan target ≥80% dengan level dan tautan ke project', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText(`Peringatan Target ${year}`)).toBeVisible()
+    // Kartu peringatan saja: project yang sama bisa juga tampil di kartu Kelengkapan data
+    const alerts = page.getByRole('region', { name: `Peringatan Target ${year}` })
+    await expect(alerts).toBeVisible()
 
-    const exceeded = page.getByRole('link').filter({ hasText: exceededProject })
+    const exceeded = alerts.getByRole('link').filter({ hasText: exceededProject })
     await expect(exceeded).toContainText('125.0%')
     await expect(exceeded).toContainText('melebihi target')
-    await expect(page.getByRole('link').filter({ hasText: warningProject })).toContainText('90.0%')
+    await expect(alerts.getByRole('link').filter({ hasText: warningProject })).toContainText('90.0%')
 
     await exceeded.click()
     await expect(page).toHaveURL(`/projects/${exceededId}`)

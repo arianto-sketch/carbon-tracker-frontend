@@ -116,11 +116,37 @@
       </v-col>
     </v-row>
 
+    <!-- Kelengkapan data bulan lalu (sama dengan isi pengingat tanggal 5 dan 10) -->
+    <v-card v-if="store.dataCompleteness" rounded="lg" elevation="1" class="mb-6" role="region" aria-labelledby="completeness-title">
+      <v-card-title id="completeness-title" class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
+        <v-icon class="mr-2" :color="incomplete.length ? 'warning' : 'success'" size="small">
+          {{ incomplete.length ? 'mdi-calendar-alert' : 'mdi-calendar-check' }}
+        </v-icon>
+        Kelengkapan data {{ store.dataCompleteness.period_label }}
+      </v-card-title>
+      <v-card-text>
+        <p v-if="!incomplete.length" class="text-body-2 text-medium-emphasis mb-0">
+          Semua {{ store.dataCompleteness.active_count }} project aktif sudah lengkap.
+        </p>
+        <template v-else>
+          <v-list density="compact" class="py-0">
+            <v-list-item v-for="p in incomplete.slice(0, COMPLETENESS_LIMIT)" :key="p.id" :to="`/projects/${p.id}`" class="px-0">
+              <v-list-item-title class="text-body-2 font-weight-medium">{{ p.name }}</v-list-item-title>
+              <v-list-item-subtitle>{{ describeGap({ empty: p.empty, missing: p.missing_factors }) }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+          <p v-if="incomplete.length > COMPLETENESS_LIMIT" class="text-body-2 text-medium-emphasis mt-2 mb-0">
+            Dan {{ incomplete.length - COMPLETENESS_LIMIT }} project lainnya belum lengkap.
+          </p>
+        </template>
+      </v-card-text>
+    </v-card>
+
     <v-row class="mb-4">
       <v-col cols="12" md="8">
         <!-- Peringatan Target -->
-        <v-card rounded="lg" elevation="1" class="h-100">
-          <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
+        <v-card rounded="lg" elevation="1" class="h-100" role="region" aria-labelledby="target-alerts-title">
+          <v-card-title id="target-alerts-title" class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
             <v-icon class="mr-2" :color="store.targetAlerts.length ? 'warning' : 'success'" size="small">
               {{ store.targetAlerts.length ? 'mdi-alert' : 'mdi-check-circle' }}
             </v-icon>
@@ -239,6 +265,7 @@ import { useDashboardStore } from '@/stores/dashboard.store'
 import { formatChange, formatCo2, formatDate, formatNumber, monthLabel, monthRangeLabel } from '@/utils/formatters'
 import { GHG_SCOPE_COLORS, PERIOD_LABELS, scopeLabel } from '@/utils/constants'
 import { changeTone, comparisonCaption, projectionCaption, type Outlook } from '@/utils/outlook'
+import { describeGap } from '@/utils/completeness'
 
 // Emisi naik = merah, turun = hijau, tetap = netral
 const TONE = {
@@ -249,6 +276,9 @@ const TONE = {
 
 const store = useDashboardStore()
 const outlook = computed<Outlook | null>(() => store.outlook)
+// Kartu kelengkapan: project selebihnya cukup disebut jumlahnya
+const COMPLETENESS_LIMIT = 5
+const incomplete = computed(() => store.dataCompleteness?.incomplete ?? [])
 const selectedYear = ref(new Date().getFullYear())
 const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 

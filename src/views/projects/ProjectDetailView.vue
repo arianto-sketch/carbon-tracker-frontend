@@ -24,6 +24,7 @@
 
       <v-tabs v-model="tab" color="primary" class="mb-4">
         <v-tab value="entries">Entri Emisi</v-tab>
+        <v-tab value="completeness">Kelengkapan</v-tab>
         <v-tab value="targets">Target</v-tab>
         <v-tab value="initiatives">Rencana Aksi</v-tab>
         <v-tab value="members">Anggota</v-tab>
@@ -33,6 +34,12 @@
       <v-window v-model="tab">
         <!-- ENTRIES TAB -->
         <v-window-item value="entries">
+          <v-alert v-if="lastGap" type="warning" variant="tonal" density="compact" class="mb-3">
+            Data {{ lastGap.label }} belum lengkap: {{ describeGap(lastGap) }}.
+            <template #append>
+              <v-btn variant="text" size="small" @click="tab = 'completeness'">Lihat kelengkapan</v-btn>
+            </template>
+          </v-alert>
           <div class="d-flex align-center justify-space-between mb-3">
             <v-select v-model="entryStatus" :items="statusOptions" label="Status" density="compact" variant="outlined"
               style="max-width:200px" @update:model-value="onStatusFilter" />
@@ -142,6 +149,12 @@
           </v-row>
         </v-window-item>
 
+        <!-- KELENGKAPAN DATA TAB -->
+        <v-window-item value="completeness">
+          <DataCompletenessPanel :project-id="id" :grid="completeness" :error="completenessError" :can-write="canWrite"
+            :reload="loadCompleteness" />
+        </v-window-item>
+
         <!-- RENCANA AKSI TAB (dimuat saat tab pertama kali dibuka) -->
         <v-window-item value="initiatives">
           <ReductionInitiativesPanel :project-id="id" :members="members" :can-write="canWrite" :can-delete="canManage" />
@@ -186,7 +199,7 @@
 
     <ProjectFormDialog v-model="editDialog" :project="project" @saved="onProjectSaved" />
     <EntryHistoryDialog v-model="historyDialog" :project-id="id" :entry-id="historyEntryId" />
-    <ImportEntriesDialog v-model="importDialog" :project-id="id" @imported="loadEntries" />
+    <ImportEntriesDialog v-model="importDialog" :project-id="id" @imported="onImported" />
 
     <v-dialog v-model="rejectDialog" max-width="480" aria-labelledby="reject-title">
       <v-card rounded="lg">
@@ -225,6 +238,10 @@ import ImportEntriesDialog from '@/components/ImportEntriesDialog.vue'
 import ProjectFormDialog from '@/components/ProjectFormDialog.vue'
 import ProjectMembersPanel from '@/components/ProjectMembersPanel.vue'
 import ReductionInitiativesPanel from '@/components/ReductionInitiativesPanel.vue'
+import DataCompletenessPanel from '@/components/DataCompletenessPanel.vue'
+import { useLatestRequest } from '@/composables/useLatestRequest'
+import { completenessService, type CompletenessGrid } from '@/services/completeness.service'
+import { describeGap, lastMonthGap } from '@/utils/completeness'
 import { formatIntensity } from '@/utils/initiatives'
 import ListPagination from '@/components/ListPagination.vue'
 import { usePageQuery } from '@/composables/usePageQuery'
@@ -269,6 +286,32 @@ async function reloadMembers() {
     if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat anggota.'))
   }
 }
+// Kelengkapan data: dipakai panel Kelengkapan dan peringatan bulan lalu di tab Entri
+const completeness = ref<CompletenessGrid | null>(null)
+const completenessError = ref(false)
+const lastGap = computed(() => lastMonthGap(completeness.value))
+const completenessRequest = useLatestRequest()
+
+async function loadCompleteness() {
+  const ticket = completenessRequest.next()
+  completenessError.value = false
+  try {
+    const grid = await completenessService.grid(id)
+    if (completenessRequest.isCurrent(ticket)) completeness.value = grid
+  } catch {
+    if (completenessRequest.isCurrent(ticket)) completenessError.value = true
+  }
+}
+
+// Dimuat ulang setiap tab dibuka: entri yang baru diajukan/disetujui mengubah status Draft -> Tercatat
+watch(tab, (value) => { if (value === 'completeness') loadCompleteness() })
+
+// Entri hasil import bisa melengkapi bulan lalu
+async function onImported() {
+  await loadEntries()
+  loadCompleteness()
+}
+
 const editDialog = ref(false)
 // Intensitas di ringkasan bergantung pada jumlah anggota tim, jadi ringkasan ikut dimuat ulang
 async function onProjectSaved(saved: any) {
@@ -456,6 +499,8 @@ onMounted(async () => {
     targets.value = tgt
     targetProgress.value = Object.fromEntries((prog ?? []).map((p: any) => [p.target_id, p]))
     await loadEntries()
+    // Tidak menunggu dan tidak menggagalkan halaman: panel menampilkan errornya sendiri
+    loadCompleteness()
   } catch (e: any) {
     // Bukan anggota -> /403; project tidak ada -> 404 dengan URL tetap
     if (!handleAccessError(e)) ui.showError(getErrorMessage(e, 'Gagal memuat project.'))

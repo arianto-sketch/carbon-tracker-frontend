@@ -60,7 +60,8 @@ test.describe('halaman error & empty state', () => {
 
   test('project baru menampilkan empty state entri dan target', async ({ page }) => {
     await page.goto(`/projects/${emptyProjectId}`)
-    await expect(page.getByText('Belum ada entri')).toBeVisible()
+    // Persis: peringatan kelengkapan data ("...belum ada entri sama sekali") juga memuat kata ini
+    await expect(page.getByText('Belum ada entri', { exact: true })).toBeVisible()
 
     await page.getByRole('tab', { name: 'Target' }).click()
     await expect(page.getByText('Belum ada target')).toBeVisible()
