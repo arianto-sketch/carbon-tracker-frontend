@@ -145,8 +145,8 @@
     <v-row class="mb-4">
       <v-col cols="12" md="8">
         <!-- Peringatan Target -->
-        <v-card rounded="lg" elevation="1" class="h-100">
-          <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
+        <v-card rounded="lg" elevation="1" class="h-100" role="region" aria-labelledby="target-alerts-title">
+          <v-card-title id="target-alerts-title" class="text-body-1 font-weight-bold pa-4 pb-2 d-flex align-center">
             <v-icon class="mr-2" :color="store.targetAlerts.length ? 'warning' : 'success'" size="small">
               {{ store.targetAlerts.length ? 'mdi-alert' : 'mdi-check-circle' }}
             </v-icon>
