@@ -43,6 +43,7 @@ import { useNotificationsStore } from '@/stores/notifications.store'
 import { useUiStore } from '@/stores/ui.store'
 import { getErrorMessage } from '@/services/api'
 import { formatDateTime } from '@/utils/formatters'
+import { notificationTarget } from '@/utils/notifications'
 
 const ICONS: Record<string, { icon: string; color: string }> = {
   entry_submitted: { icon: 'mdi-send', color: 'orange' },
@@ -51,6 +52,8 @@ const ICONS: Record<string, { icon: string; color: string }> = {
   // Ringkasan approve/tolak massal
   entries_approved: { icon: 'mdi-check-all', color: 'green' },
   entries_rejected: { icon: 'mdi-close-box-multiple', color: 'red' },
+  // Pengingat data bulan lalu yang belum dicatat/diajukan (tanggal 5 dan 10)
+  data_reminder: { icon: 'mdi-calendar-alert', color: 'orange' },
 }
 const POLL_MS = 60_000
 
@@ -68,7 +71,8 @@ async function openNotification(n: any) {
     ui.showError(getErrorMessage(e, 'Gagal menandai notifikasi.'))
   }
   open.value = false
-  if (n.data.project_id) router.push(`/projects/${n.data.project_id}`)
+  const target = notificationTarget(n.data)
+  if (target) router.push(target)
 }
 
 async function loadMore() {

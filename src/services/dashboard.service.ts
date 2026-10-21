@@ -1,7 +1,13 @@
 import api from './api'
+import type { DashboardCompleteness } from './completeness.service'
 import type { InitiativeSummary } from './initiatives.service'
 
 export const dashboardService = {
+  // Project yang datanya belum lengkap di bulan lalu (tidak mengikuti filter tahun dashboard)
+  async getDataCompleteness(): Promise<DashboardCompleteness> {
+    const { data } = await api.get('/dashboard/data-completeness')
+    return data.data
+  },
   async getSummary(params = {}) {
     const { data } = await api.get('/dashboard/summary', { params })
     return data.data
