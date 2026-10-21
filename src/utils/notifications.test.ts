@@ -13,6 +13,7 @@ describe('notificationTarget', () => {
 
   it('tidak mengikuti link ke luar aplikasi', () => {
     expect(notificationTarget({ link: '//contoh.test/x', project_id: 3 })).toBe('/projects/3')
+    expect(notificationTarget({ link: '/\\contoh.test', project_id: 3 })).toBe('/projects/3')
     expect(notificationTarget({ link: 'https://contoh.test', project_id: null })).toBeNull()
   })
 

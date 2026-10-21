@@ -3,7 +3,7 @@
  * menuju dashboard) bila berupa path internal aplikasi, selain itu halaman project-nya.
  */
 export function notificationTarget(data: { link?: string | null; project_id?: number | null }): string | null {
-  // Hanya path internal: "//domain-lain" atau URL penuh tidak diikuti
-  if (typeof data.link === 'string' && data.link.startsWith('/') && !data.link.startsWith('//')) return data.link
+  // Hanya path internal: "//domain-lain", "/\domain-lain" (dianggap "//" oleh browser), atau URL penuh tidak diikuti
+  if (typeof data.link === 'string' && /^\/(?![/\\])/.test(data.link)) return data.link
   return data.project_id ? `/projects/${data.project_id}` : null
 }

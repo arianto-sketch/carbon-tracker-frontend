@@ -49,7 +49,10 @@ export const completenessService = {
     await api.post(`/projects/${projectId}/data-gaps/dismissals`, target)
   },
   async undismiss(projectId: number, target: GapTarget) {
-    // emission_factor_id null tidak ikut dikirim (axios mengabaikan parameter null) = seluruh project
-    await api.delete(`/projects/${projectId}/data-gaps/dismissals`, { params: target })
+    // Tanpa emission_factor_id = seluruh project
+    const { emission_factor_id, ...period } = target
+    await api.delete(`/projects/${projectId}/data-gaps/dismissals`, {
+      params: emission_factor_id == null ? period : { ...period, emission_factor_id },
+    })
   },
 }

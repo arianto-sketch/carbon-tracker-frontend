@@ -24,10 +24,15 @@ test.beforeAll(async () => {
 
   // Bulan terakhir yang lengkap menurut server (zona waktu bisnis), bukan jam runner
   const period = (await (await pmApi.get('dashboard/data-completeness')).json()).data.period as string
-  const factorId = async (search: string) =>
-    (await (await pmApi.get('emission-factors', { params: { search, is_active: 1 } })).json()).data[0].id
+  // Nama persis: pencarian bisa mengembalikan faktor lain yang namanya mirip
+  const factorId = async (name: string) => {
+    const factors = (await (await pmApi.get('emission-factors', { params: { search: name, is_active: 1 } })).json()).data
+    const factor = factors.find((f: any) => f.name === name)
+    expect(factor, `faktor emisi "${name}" dari seeder`).toBeTruthy()
+    return factor.id
+  }
   const electricity = await factorId('Listrik PLN Jawa-Bali')
-  const gasoline = await factorId('Bensin')
+  const gasoline = await factorId('Bensin (kendaraan)')
 
   // Listrik tercatat 2 bulan sebelumnya (rutin) tapi kosong bulan lalu; bensin ada bulan lalu (project tidak kosong)
   for (const [emission_factor_id, entry_date] of [[electricity, tenthOf(period, 2)], [electricity, tenthOf(period, 1)], [gasoline, tenthOf(period, 0)]]) {
@@ -50,7 +55,7 @@ test('bulan lalu yang belum lengkap diperingatkan dan bisa ditandai tidak ada da
   const panel = page.getByRole('table', { name: /Kelengkapan data/ })
   const row = panel.getByRole('row').filter({ hasText: 'Listrik PLN Jawa-Bali' })
   await expect(row).toContainText('Belum diisi')
-  await expect(panel.getByRole('row').filter({ hasText: 'Bensin' })).toContainText('Draft')
+  await expect(panel.getByRole('row').filter({ hasText: 'Bensin (kendaraan)' })).toContainText('Draft')
 
   await row.getByRole('button', { name: `Tandai Listrik PLN Jawa-Bali ${monthLabel} tidak ada data` }).click()
   await expect(page.getByText(`Ditandai tidak ada data ${monthLabel}.`)).toBeVisible()

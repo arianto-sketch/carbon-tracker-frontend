@@ -24,15 +24,15 @@
           <td v-for="m in grid.months" :key="`project-${m.year}-${m.month}`" class="text-center">
             <template v-if="m.empty">
               <v-chip color="error" size="small" variant="tonal" prepend-icon="mdi-alert-circle">Belum ada entri</v-chip>
-              <v-btn v-if="canWrite" size="x-small" variant="text" :loading="busy === key(m)"
+              <v-btn v-if="canWrite" size="x-small" variant="text" :loading="busy === key(m)" :disabled="busy !== null"
                 :aria-label="`Tandai seluruh project ${m.label} tidak ada data`" @click="mark(m)">Tidak ada data</v-btn>
             </template>
             <template v-else-if="m.dismissed">
               <v-chip :color="STATUS.dismissed.color" size="small" variant="tonal" :prepend-icon="STATUS.dismissed.icon">{{ STATUS.dismissed.label }}</v-chip>
-              <v-btn v-if="canWrite" size="x-small" variant="text" :loading="busy === key(m)"
+              <v-btn v-if="canWrite" size="x-small" variant="text" :loading="busy === key(m)" :disabled="busy !== null"
                 :aria-label="`Batalkan tanda seluruh project ${m.label}`" @click="unmark(m)">Batalkan</v-btn>
             </template>
-            <span v-else class="text-medium-emphasis">—</span>
+            <template v-else><span class="text-medium-emphasis" aria-hidden="true">—</span><span class="d-sr-only">ada entri</span></template>
           </td>
         </tr>
         <tr v-if="!grid.factors.length && !showProjectRow">
@@ -44,14 +44,14 @@
         <tr v-for="f in grid.factors" :key="f.id">
           <td>{{ f.name }}</td>
           <td v-for="(s, i) in f.statuses" :key="i" class="text-center">
-            <span v-if="s === 'none'" class="text-medium-emphasis">—</span>
+            <template v-if="s === 'none'"><span class="text-medium-emphasis" aria-hidden="true">—</span><span class="d-sr-only">bukan faktor rutin</span></template>
             <v-chip v-else :color="STATUS[s].color" size="small" variant="tonal" :prepend-icon="STATUS[s].icon">{{ STATUS[s].label }}</v-chip>
             <template v-if="canWrite">
-              <v-btn v-if="s === 'missing'" size="x-small" variant="text" :loading="busy === key(grid.months[i]!, f.id)"
+              <v-btn v-if="s === 'missing'" size="x-small" variant="text" :loading="busy === key(grid.months[i]!, f.id)" :disabled="busy !== null"
                 :aria-label="`Tandai ${f.name} ${grid.months[i]!.label} tidak ada data`" @click="mark(grid.months[i]!, f.id)">Tidak ada data</v-btn>
               <!-- Tanda untuk seluruh project dibatalkan dari baris "Seluruh project" -->
               <v-btn v-else-if="s === 'dismissed' && !grid.months[i]!.dismissed" size="x-small" variant="text"
-                :loading="busy === key(grid.months[i]!, f.id)" :aria-label="`Batalkan tanda ${f.name} ${grid.months[i]!.label}`"
+                :loading="busy === key(grid.months[i]!, f.id)" :disabled="busy !== null" :aria-label="`Batalkan tanda ${f.name} ${grid.months[i]!.label}`"
                 @click="unmark(grid.months[i]!, f.id)">Batalkan</v-btn>
             </template>
           </td>

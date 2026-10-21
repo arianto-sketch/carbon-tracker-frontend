@@ -303,6 +303,9 @@ async function loadCompleteness() {
   }
 }
 
+// Dimuat ulang setiap tab dibuka: entri yang baru diajukan/disetujui mengubah status Draft -> Tercatat
+watch(tab, (value) => { if (value === 'completeness') loadCompleteness() })
+
 // Entri hasil import bisa melengkapi bulan lalu
 async function onImported() {
   await loadEntries()
